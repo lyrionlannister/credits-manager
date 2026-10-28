@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
+import { DatePicker } from '@ui/forms/components/date-picker';
 import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Spinner } from '@ui/spinner/components/spinner';
@@ -13,7 +14,7 @@ export const UvtValueForm: FC<UvtValueFormProps> = ({ valorUvtId, initialData, o
     const { sendRequest } = useSendRequest();
     const isEditMode = valorUvtId !== undefined;
 
-    const [anio, setAnio] = useState(initialData?.anio ? String(initialData.anio) : String(new Date().getFullYear()));
+    const [fechaDesde, setFechaDesde] = useState(() => initialData?.fecha_desde ?? new Date().toISOString().slice(0, 10));
     const [valor, setValor] = useState(initialData?.valor ?? '');
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +32,7 @@ export const UvtValueForm: FC<UvtValueFormProps> = ({ valorUvtId, initialData, o
                   })
                 : await sendRequest<{ valor_uvt: ApiUvtValue }>('/gastos/valores-uvt', {
                       method: 'POST',
-                      body: { anio: Number(anio), valor: parseFloat(valor) || 0 },
+                      body: { fecha_desde: fechaDesde, valor: parseFloat(valor) || 0 },
                   });
 
             onSaved(respuesta.valor_uvt);
@@ -57,8 +58,8 @@ export const UvtValueForm: FC<UvtValueFormProps> = ({ valorUvtId, initialData, o
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                     <div>
-                        <Label htmlFor="anio">Año</Label>
-                        <Input id="anio" name="anio" type="number" required disabled={isEditMode} value={anio} onChange={(event) => setAnio(event.target.value)} />
+                        <Label htmlFor="fecha-desde">Vigente desde</Label>
+                        <DatePicker id="fecha-desde" name="fecha-desde" required disabled={isEditMode} value={fechaDesde} onChange={setFechaDesde} />
                     </div>
 
                     <div className="md:col-span-2">

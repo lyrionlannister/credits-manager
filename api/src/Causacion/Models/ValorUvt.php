@@ -7,8 +7,11 @@ use App\Core\Concerns\PerteneceAEmpresa;
 use App\Core\Dinero\DineroCast;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-/** La UVT la fija la DIAN cada año, pero cada empresa la administra por su cuenta (un admin no puede alterar la de otra). */
-#[Fillable(['empresa_id', 'anio', 'valor'])]
+/**
+ * La UVT la fija la DIAN, pero puede cambiar más de una vez en el mismo año; cada empresa administra la suya por
+ * su cuenta (un admin no puede alterar la de otra). `fecha_hasta` nula es la vigencia abierta (la actual).
+ */
+#[Fillable(['empresa_id', 'fecha_desde', 'fecha_hasta', 'valor'])]
 class ValorUvt extends BaseModel
 {
     use PerteneceAEmpresa;
@@ -18,7 +21,8 @@ class ValorUvt extends BaseModel
     protected function casts(): array
     {
         return [
-            'anio' => 'integer',
+            'fecha_desde' => 'date:Y-m-d',
+            'fecha_hasta' => 'date:Y-m-d',
             'valor' => DineroCast::class,
         ];
     }

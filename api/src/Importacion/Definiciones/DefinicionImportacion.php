@@ -163,10 +163,10 @@ final class DefinicionImportacion
             TipoImportacion::ValoresUvt => [
                 'hoja' => 'Valores_UVT',
                 'orden' => 10,
-                'nota' => 'Un valor por año. Si el año ya existe, se reemplaza.',
+                'nota' => 'Abre una nueva vigencia desde la fecha indicada; si había una vigencia abierta, se cierra el día anterior.',
                 'permiso' => ['importaciones', 'importar_valores_uvt'],
                 'columnas' => [
-                    self::c('anio', 'Año', true, 'entero'),
+                    self::c('fecha_desde', 'Fecha desde', true, 'fecha'),
                     self::c('valor', 'Valor UVT', true, 'monto'),
                 ],
             ],

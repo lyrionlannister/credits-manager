@@ -171,7 +171,7 @@ class PermisosPorPantallaTest extends TestCase
         $this->postJson('/api/v1/contabilidad/plan-cuentas', [])->assertForbidden();
 
         $this->actuarCon(['tributario.crear_valores_uvt']);
-        $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2031, 'valor' => '47065'])->assertCreated();
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2031-01-01', 'valor' => '47065'])->assertCreated();
         $this->postJson('/api/v1/gastos/actividades-economicas', [])->assertForbidden();
         $this->getJson('/api/v1/gastos/valores-uvt')->assertForbidden();
     }

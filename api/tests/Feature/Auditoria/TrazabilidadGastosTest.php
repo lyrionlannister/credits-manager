@@ -110,19 +110,18 @@ class TrazabilidadGastosTest extends TestCase
         $this->assertEventoAuditoria('crear', 'gastos', 'actividad_economica', $actividadId);
     }
 
-    public function test_guardar_el_valor_uvt_deja_creacion_y_luego_el_cambio_de_valor(): void
+    public function test_una_nueva_vigencia_de_valor_uvt_deja_su_creacion_y_el_cierre_de_la_anterior(): void
     {
         $this->actingAsAdmin();
+        $anterior = $this->crearValorUvt(2025, 47065);
 
-        $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2026, 'valor' => 47065])->assertSuccessful();
-        $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2026, 'valor' => 47065])->assertSuccessful();
-        $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2026, 'valor' => 49799])->assertSuccessful();
+        $nuevaId = $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2026-01-01', 'valor' => 49799])
+            ->assertCreated()->json('valor_uvt.id');
 
-        $this->assertCount(1, $this->eventosDeAuditoria('crear', 'gastos'));
-        $cambio = $this->eventosDeAuditoria('modificar', 'gastos');
-        $this->assertCount(1, $cambio, 'guardar el mismo valor no es un cambio');
-        $this->assertSame(['valor' => '47065.00'], $cambio[0]['valores_anteriores']);
-        $this->assertSame(['valor' => '49799.00'], $cambio[0]['valores_nuevos']);
+        $this->assertEventoAuditoria('crear', 'gastos', 'valor_uvt', $nuevaId);
+        $cierre = $this->assertEventoAuditoria('modificar', 'gastos', 'valor_uvt', $anterior->id);
+        $this->assertNull($cierre['valores_anteriores']['fecha_hasta'] ?? null);
+        $this->assertStringStartsWith('2025-12-31', $cierre['valores_nuevos']['fecha_hasta']);
     }
 
     public function test_una_nueva_vigencia_de_parametrizacion_deja_su_creacion_y_el_cierre_de_la_anterior(): void
