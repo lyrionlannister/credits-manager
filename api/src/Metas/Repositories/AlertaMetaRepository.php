@@ -27,6 +27,12 @@ class AlertaMetaRepository extends BaseRepository
         }
     }
 
+    /** Soft delete en lote, por el mismo motivo que `AlertaObligacionTributariaRepository::eliminarDeObligacion`. */
+    public function eliminarDeMeta(int $metaId): void
+    {
+        $this->consulta()->where('meta_id', $metaId)->delete();
+    }
+
     /** @param int|null $usuarioId null: todas las alertas de la empresa; si no, las de empresa y las del propio asesor */
     public function visiblesPara(int $empresaId, ?int $usuarioId): Collection
     {
