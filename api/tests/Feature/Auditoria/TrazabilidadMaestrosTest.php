@@ -179,7 +179,7 @@ class TrazabilidadMaestrosTest extends TestCase
         Storage::fake('public');
         $admin = $this->actingAsAdmin();
 
-        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>')])->assertOk();
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png')])->assertOk();
 
         $evento = $this->assertEventoAuditoria('modificar', 'empresas', 'empresa', $admin->empresa_id);
         $this->assertNull($evento['valores_anteriores']['logo_path']);

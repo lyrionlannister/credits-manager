@@ -19,6 +19,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class EmpresaService
 {
@@ -138,14 +140,23 @@ class EmpresaService
     {
         $empresa = $this->obtenerPropia();
 
-        if ($empresa->logo_path) {
-            Storage::disk('public')->delete(str_replace('storage/', '', $empresa->logo_path));
+        foreach ([$empresa->logo_path, $empresa->logo_pdf_path] as $anterior) {
+            if ($anterior) {
+                Storage::disk('public')->delete(str_replace('storage/', '', $anterior));
+            }
         }
 
-        $anteriores = $empresa->only(['logo_path']);
+        $anteriores = $empresa->only(['logo_path', 'logo_pdf_path']);
         $path = $logo->store('logos', 'public');
+        $pathPdf = $logo->getMimeType() === 'image/svg+xml' ? $this->rasterizarLogoParaPdf($path) : null;
 
-        $empresa = $this->empresas->actualizar($empresa, ['logo_path' => 'storage/'.$path]);
+        $empresa = $this->empresas->actualizar($empresa, [
+            'logo_path' => 'storage/'.$path,
+            'logo_pdf_path' => $pathPdf ? 'storage/'.$pathPdf : null,
+        ]);
+
+        $nuevos = $empresa->only(['logo_path', 'logo_pdf_path']);
+        $cambiados = array_keys(array_diff_assoc($nuevos, $anteriores));
 
         $this->auditoria->registrar(
             AccionAuditoria::Modificar,
@@ -153,11 +164,41 @@ class EmpresaService
             "Logo de la empresa {$empresa->nombre_empresa} actualizado",
             'empresa',
             $empresa->id,
-            anteriores: $anteriores,
-            nuevos: $empresa->only(['logo_path']),
+            anteriores: array_intersect_key($anteriores, array_flip($cambiados)),
+            nuevos: array_intersect_key($nuevos, array_flip($cambiados)),
         );
 
         return $empresa;
+    }
+
+    /** Backfill para empresas que subieron su logo SVG antes de que existiera `logo_pdf_path`. */
+    public function rasterizarLogoPendiente(Empresa $empresa): bool
+    {
+        if ($empresa->logo_pdf_path || ! $empresa->logo_path || ! str_ends_with($empresa->logo_path, '.svg')) {
+            return false;
+        }
+
+        $pathPdf = $this->rasterizarLogoParaPdf(Str::after($empresa->logo_path, 'storage/'));
+
+        if (! $pathPdf) {
+            return false;
+        }
+
+        $this->empresas->actualizar($empresa, ['logo_pdf_path' => 'storage/'.$pathPdf]);
+
+        return true;
+    }
+
+    /** El SVG se ve mejor en la web, pero dompdf lo pinta con fondo negro: para el PDF se rasteriza a PNG con rsvg-convert. */
+    private function rasterizarLogoParaPdf(string $pathSvg): ?string
+    {
+        $disco = Storage::disk('public');
+        $pathPng = Str::replaceLast('.svg', '.png', $pathSvg);
+
+        $proceso = new Process(['rsvg-convert', '--width', '480', $disco->path($pathSvg), '-o', $disco->path($pathPng)]);
+        $proceso->run();
+
+        return $proceso->isSuccessful() ? $pathPng : null;
     }
 
     /** @return array<string, Rol> roles creados, indexados por nombre */

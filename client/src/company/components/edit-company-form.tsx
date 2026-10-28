@@ -253,7 +253,12 @@ export const EditCompanyForm: FC = () => {
                                 Subiendo logo…
                             </div>
                         ) : (
-                            <Dropzone id="logo-empresa" onFileAccepted={handleLogoDrop} hint="PNG, JPG, GIF o SVG — máx. 2MB" />
+                            <Dropzone
+                                id="logo-empresa"
+                                onFileAccepted={handleLogoDrop}
+                                accept={{ 'image/png': [], 'image/jpeg': [], 'image/gif': [], 'image/svg+xml': [] }}
+                                hint="PNG, JPG, GIF o SVG — máx. 2MB"
+                            />
                         )}
                     </section>
                 </div>

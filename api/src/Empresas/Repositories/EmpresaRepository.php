@@ -4,6 +4,7 @@ namespace App\Empresas\Repositories;
 
 use App\Core\Base\BaseRepository;
 use App\Empresas\Models\Empresa;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class EmpresaRepository extends BaseRepository
@@ -22,5 +23,11 @@ class EmpresaRepository extends BaseRepository
         }
 
         return $consulta->paginate(perPage: $porPagina, page: $pagina);
+    }
+
+    /** Backfill de todas las empresas, no solo la propia: no hay sesión en el comando artisan que la usa. */
+    public function conLogoSvgPendienteDeRasterizar(): Collection
+    {
+        return $this->consulta()->whereNull('logo_pdf_path')->whereNotNull('logo_path')->where('logo_path', 'like', '%.svg')->get();
     }
 }

@@ -93,6 +93,9 @@ jobs:
       - name: Estilo (Pint)
         run: vendor/bin/pint --test
 
+      - name: rsvg-convert (logo SVG de la empresa → PNG para el PDF)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends librsvg2-bin
+
       - name: Pruebas (PHPUnit)
         run: vendor/bin/phpunit --coverage-clover=coverage.xml --coverage-text
         env:
