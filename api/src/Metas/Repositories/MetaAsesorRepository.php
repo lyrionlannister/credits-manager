@@ -14,6 +14,11 @@ class MetaAsesorRepository extends BaseRepository
         parent::__construct($metaAsesor);
     }
 
+    public function eliminarDeMeta(int $metaId): void
+    {
+        $this->consulta()->where('meta_id', $metaId)->delete();
+    }
+
     /**
      * Deja la distribución de la meta igual a `$pares` (usuario_id => valor). Lo que sale se borra con soft delete;
      * lo que vuelve a entrar se restaura, porque la unicidad (meta, usuario) incluye las filas borradas.

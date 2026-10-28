@@ -80,8 +80,8 @@ class ValorUvtControllerTest extends TestCase
 
         $respuesta = $this->patchJson("/api/v1/gastos/valores-uvt/{$valorUvt->id}", ['valor' => 49799]);
 
-        $respuesta->assertStatus(200)->assertJsonPath('valor_uvt.anio', 2027);
-        $this->assertDatabaseHas('valores_uvt', ['id' => $valorUvt->id, 'anio' => 2027, 'valor' => 4979900]);
+        $respuesta->assertStatus(200)->assertJsonPath('valor_uvt.fecha_desde', '2027-01-01');
+        $this->assertDatabaseHas('valores_uvt', ['id' => $valorUvt->id, 'valor' => 4979900]);
     }
 
     public function test_no_se_puede_editar_un_anio_con_gastos_causados(): void
@@ -143,5 +143,64 @@ class ValorUvtControllerTest extends TestCase
             ->assertJsonValidationErrors('valor_uvt');
 
         $this->assertDatabaseHas('valores_uvt', ['id' => $valorUvt->id, 'borrado_en' => null]);
+    }
+
+    public function test_sin_autenticar_no_puede_crear(): void
+    {
+        $this->actingAsAdmin();
+        $this->salirDeSesion();
+
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-01-01', 'valor' => 47065])->assertStatus(401);
+    }
+
+    public function test_sin_permiso_no_puede_crear(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $this->actingAsAsesor(Empresa::find($admin->empresa_id));
+
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-01-01', 'valor' => 47065])->assertStatus(403);
+    }
+
+    public function test_crear_exige_fecha_desde_y_valor_validos(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/gastos/valores-uvt', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['fecha_desde', 'valor']);
+    }
+
+    public function test_crea_un_valor_uvt_con_vigencia_abierta(): void
+    {
+        $this->actingAsAdmin();
+
+        $respuesta = $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-01-01', 'valor' => 47065]);
+
+        $respuesta->assertStatus(201)->assertJsonPath('valor_uvt.fecha_hasta', null);
+        $this->assertDatabaseHas('valores_uvt', ['fecha_desde' => '2027-01-01', 'fecha_hasta' => null, 'valor' => 4706500]);
+    }
+
+    /** El nuevo valor nunca sobrescribe el anterior: lo cierra el día previo y queda como historial. */
+    public function test_crear_un_valor_nuevo_cierra_la_vigencia_abierta_anterior(): void
+    {
+        $this->actingAsAdmin();
+        $valorUvt = $this->crearValorUvt(2027, 47065);
+        $this->causarGastoEnAnio(2027);
+
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-07-01', 'valor' => 49799])->assertStatus(201);
+
+        $this->assertDatabaseHas('valores_uvt', ['id' => $valorUvt->id, 'fecha_hasta' => '2027-06-30', 'valor' => 4706500]);
+        $this->assertDatabaseHas('valores_uvt', ['fecha_desde' => '2027-07-01', 'fecha_hasta' => null, 'valor' => 4979900]);
+    }
+
+    public function test_crear_falla_si_la_fecha_cae_en_un_rango_ya_cerrado(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearValorUvt(2027, 47065);
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-07-01', 'valor' => 49799])->assertStatus(201);
+
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-03-01', 'valor' => 48000])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('fecha_desde');
     }
 }

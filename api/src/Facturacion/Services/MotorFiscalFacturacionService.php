@@ -67,7 +67,7 @@ class MotorFiscalFacturacionService
         }
 
         if ($parametrizacion->base_minima_uvt !== null) {
-            $uvt = $this->valoresUvt->paraAnio((int) date('Y', strtotime($fecha)));
+            $uvt = $this->valoresUvt->vigenteParaFecha($fecha);
             $baseMinima = $uvt?->valor->multiplicarPorTasa((float) $parametrizacion->base_minima_uvt) ?? Dinero::cero();
 
             if ($valor->menorQue($baseMinima)) {

@@ -54,9 +54,10 @@ trait CreatesGastosFixtures
         ], $overrides));
     }
 
+    /** Vigencia abierta (sin `fecha_hasta`) desde el 1 de enero del año dado. */
     protected function crearValorUvt(int $anio = 2026, float $valor = 47065): ValorUvt
     {
-        return ValorUvt::create(['anio' => $anio, 'valor' => $valor]);
+        return ValorUvt::create(['fecha_desde' => "{$anio}-01-01", 'valor' => $valor]);
     }
 
     /** Ficha de parametrización con todas las cuentas necesarias ya creadas, vigente desde 2026-01-01 salvo que se indique otra fecha. */

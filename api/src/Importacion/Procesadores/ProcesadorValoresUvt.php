@@ -6,8 +6,9 @@ use App\Causacion\Services\ValorUvtService;
 use App\Importacion\Data\ContextoEjecucion;
 use App\Importacion\Data\FilaRechazada;
 use App\Importacion\Lectura\ConvertidorValor;
+use Illuminate\Validation\ValidationException;
 
-/** Un valor por año, propio de la empresa que importa. Reimportar un año existente lo reemplaza. */
+/** Abre una vigencia nueva; el Service cierra la vigencia abierta anterior, si existía. */
 final class ProcesadorValoresUvt implements ProcesadorFila
 {
     public function __construct(private readonly ValorUvtService $valoresUvt) {}
@@ -16,12 +17,8 @@ final class ProcesadorValoresUvt implements ProcesadorFila
 
     public function procesar(array $valores, ContextoEjecucion $ctx): void
     {
-        $anio = ConvertidorValor::entero($valores['anio'], 'anio')
-            ?? throw new FilaRechazada('El año es obligatorio.', 'anio');
-
-        if ($anio < 2000 || $anio > 2100) {
-            throw new FilaRechazada('El año debe estar entre 2000 y 2100.', 'anio');
-        }
+        $fechaDesde = ConvertidorValor::fecha($valores['fecha_desde'], 'fecha_desde')
+            ?? throw new FilaRechazada('La fecha desde es obligatoria.', 'fecha_desde');
 
         $valor = ConvertidorValor::monto($valores['valor'], 'valor')
             ?? throw new FilaRechazada('El valor UVT es obligatorio.', 'valor');
@@ -34,6 +31,10 @@ final class ProcesadorValoresUvt implements ProcesadorFila
             return;
         }
 
-        $this->valoresUvt->guardar($anio, (float) $valor->aDecimalString());
+        try {
+            $this->valoresUvt->crear($fechaDesde, $valor);
+        } catch (ValidationException $excepcion) {
+            throw new FilaRechazada($excepcion->validator->errors()->first(), 'fecha_desde');
+        }
     }
 }
