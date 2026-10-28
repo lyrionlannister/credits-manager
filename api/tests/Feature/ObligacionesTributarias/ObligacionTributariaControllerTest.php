@@ -356,8 +356,8 @@ class ObligacionTributariaControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")->assertStatus(204);
 
-        $this->assertSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id]);
-        $this->assertSoftDeleted('alertas_obligaciones_tributarias', ['id' => $alertaId]);
+        $this->assertSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id], null, 'borrado_en');
+        $this->assertSoftDeleted('alertas_obligaciones_tributarias', ['id' => $alertaId], null, 'borrado_en');
     }
 
     public function test_no_elimina_una_obligacion_cumplida(): void
@@ -368,7 +368,7 @@ class ObligacionTributariaControllerTest extends TestCase
         $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")
             ->assertStatus(422)
             ->assertJsonValidationErrors('obligacion');
-        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id]);
+        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id], null, 'borrado_en');
     }
 
     public function test_una_obligacion_eliminada_se_puede_volver_a_crear_en_el_mismo_periodo(): void
@@ -393,6 +393,6 @@ class ObligacionTributariaControllerTest extends TestCase
         $this->actingAsAdmin();
 
         $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacionAjena->id}")->assertStatus(404);
-        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacionAjena->id]);
+        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacionAjena->id], null, 'borrado_en');
     }
 }

@@ -242,7 +242,7 @@ class MetasHttpTest extends TestCase
         $this->actingAsAsesor(Empresa::findOrFail($admin->empresa_id));
 
         $this->deleteJson("/api/v1/metas/{$meta->id}")->assertForbidden();
-        $this->assertNotSoftDeleted('metas', ['id' => $meta->id]);
+        $this->assertNotSoftDeleted('metas', ['id' => $meta->id], null, 'borrado_en');
     }
 
     public function test_eliminar_meta_inexistente_responde_404(): void
@@ -260,8 +260,8 @@ class MetasHttpTest extends TestCase
 
         $this->deleteJson("/api/v1/metas/{$meta->id}")->assertNoContent();
 
-        $this->assertSoftDeleted('metas', ['id' => $meta->id]);
-        $this->assertSoftDeleted('metas_asesor', ['id' => $fila->id]);
+        $this->assertSoftDeleted('metas', ['id' => $meta->id], null, 'borrado_en');
+        $this->assertSoftDeleted('metas_asesor', ['id' => $fila->id], null, 'borrado_en');
         $this->assertEventoAuditoria('eliminar', 'metas', 'meta', $meta->id);
     }
 
@@ -282,6 +282,6 @@ class MetasHttpTest extends TestCase
         $this->actingAsAdmin();
 
         $this->deleteJson("/api/v1/metas/{$ajena->id}")->assertNotFound();
-        $this->assertNotSoftDeleted('metas', ['id' => $ajena->id]);
+        $this->assertNotSoftDeleted('metas', ['id' => $ajena->id], null, 'borrado_en');
     }
 }

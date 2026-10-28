@@ -166,6 +166,6 @@ class CierreMetasTest extends TestCase
         [, , , $colocacion] = $this->septiembreCerrado();
 
         $this->deleteJson("/api/v1/metas/{$colocacion->id}")->assertUnprocessable()->assertJsonValidationErrors(['meta']);
-        $this->assertNotSoftDeleted('metas', ['id' => $colocacion->id]);
+        $this->assertNotSoftDeleted('metas', ['id' => $colocacion->id], null, 'borrado_en');
     }
 }
