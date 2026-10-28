@@ -17,7 +17,7 @@
     "@fullcalendar/react": "^6.1.22",
     "@fullcalendar/timegrid": "^6.1.22",
     "@tailwindcss/postcss": "^4.3.3",
-    "apexcharts": "^3.54.1",
+    "apexcharts": "^8.5.0",
     "flatpickr": "^4.6.13",
     "laravel-echo": "^2.6.1",
     "lucide-react": "^0.545.0",
