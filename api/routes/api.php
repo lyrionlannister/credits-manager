@@ -241,6 +241,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{meta}/asesores', [MetaController::class, 'distribuir'])->whereNumber('meta');
         });
 
+        Route::delete('/{meta}', [MetaController::class, 'destroy'])->whereNumber('meta')->middleware('permiso:metas,eliminar');
         Route::post('/cierres/recalcular', [CierreMetaController::class, 'recalcular'])->middleware('permiso:metas,recalcular');
     });
 
@@ -256,6 +257,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/tipos', [TipoObligacionTributariaController::class, 'index'])->middleware('permiso:obligaciones_tributarias,listar');
         Route::post('/tipos', [TipoObligacionTributariaController::class, 'store'])->middleware('permiso:obligaciones_tributarias,configurar');
         Route::put('/tipos/{tipo}', [TipoObligacionTributariaController::class, 'update'])->whereNumber('tipo')->middleware('permiso:obligaciones_tributarias,configurar');
+        Route::delete('/tipos/{tipo}', [TipoObligacionTributariaController::class, 'destroy'])->whereNumber('tipo')->middleware('permiso:obligaciones_tributarias,eliminar_tipos');
 
         // Catálogo de consulta: lo usa el formulario de crear/editar obligación para elegir responsable.
         Route::get('/responsables-asignables', [ObligacionTributariaController::class, 'responsablesAsignables'])
@@ -265,6 +267,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{obligacion}', [ObligacionTributariaController::class, 'update'])->whereNumber('obligacion')->middleware('permiso:obligaciones_tributarias,editar');
         Route::put('/{obligacion}/estado', [ObligacionTributariaController::class, 'cambiarEstado'])
             ->whereNumber('obligacion')->middleware('permiso:obligaciones_tributarias,cambiar_estado');
+        Route::delete('/{obligacion}', [ObligacionTributariaController::class, 'destroy'])->whereNumber('obligacion')->middleware('permiso:obligaciones_tributarias,eliminar');
     });
 
     Route::get('/contabilidad/plan-cuentas', [PlanCuentaController::class, 'index'])->middleware('algun_permiso:'.implode(',', ContabilidadConstants::CONSULTA_PLAN_CUENTAS));
