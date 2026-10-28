@@ -4,16 +4,27 @@
 
 ```
 PR hacia main ──► CI (.github/workflows/ci.yml)
-                    ├─ API: Pint + PHPUnit (con Redis real)
-                    ├─ Migraciones: todas, desde cero, en MySQL 8.4
-                    ├─ Cliente: lint + Vitest + build
-                    └─ Imágenes de producción: api y nginx construyen
-                  Branch protection: sin los 4 checks en verde no se puede hacer merge.
+                    ├─ Detectar cambios (paths-filter): decide cuáles de los jobs de abajo corren
+                    ├─ API: Pint + PHPUnit + coverage + composer audit        — si cambió api/**
+                    ├─ Migraciones: todas, desde cero, en MySQL 8.4           — si cambió api/**
+                    ├─ Cliente: lint + pnpm audit + Vitest + build            — si cambió client/**
+                    ├─ Imágenes: build + Trivy (CRITICAL/HIGH bloquea)        — si cambió api/**, client/** o los Dockerfile
+                    │    en push a main, además publica en ghcr.io por SHA (§2.5)
+                    └─ Shellcheck de scripts/*.sh                            — si cambió scripts/**
+                  Branch protection: sin los 4 checks originales en verde no se puede hacer merge (§2.4).
+                  Un job que no corre por el filtro queda "skipped": GitHub lo cuenta como pasado para el check requerido.
+
+             ──► CodeQL (.github/workflows/codeql.yml): análisis de seguridad estático, PHP + TS,
+                  en cada PR/push y además una vez por semana. No es un check requerido todavía (§2.4).
 
 merge a main ──► CI otra vez sobre el commit de main
              ──► Deploy (.github/workflows/deploy.yml)
                     ├─ environment `PROD` (secretos de despliegue, solo rama main)
                     └─ SSH al servidor ──► scripts/deploy.sh <sha>    (automático, sin aprobación)
+                         descarga de ghcr.io las imágenes que ya construyó y escaneó el CI (no las reconstruye)
+                         si falla después de recrear contenedores y sin migración a medias, revierte sola (§3.1)
+
+Dependabot (.github/dependabot.yml): PRs semanales para composer, pnpm, Dockerfiles y Actions.
 ```
 
 `scripts/deploy.sh` (instalado como `/usr/local/sbin/credits-manager-deploy`) hace el procedimiento de §5 del [manual técnico](manual-tecnico.md):
@@ -21,7 +32,7 @@ merge a main ──► CI otra vez sobre el commit de main
 1. Valida que el SHA sea el de `origin/main`. Si hubo un merge posterior, no hace nada: ese otro despliegue se encarga.
 2. Hace `git merge --ff-only` en el checkout de producción.
 3. **Respaldo previo** (`respaldos:ejecutar --manual`). Si falla, se detiene sin tocar los contenedores.
-4. Ejecuta `podman compose build` y etiqueta las imágenes con el SHA para poder revertir.
+4. Descarga de ghcr.io las imágenes que ya construyó y escaneó el CI para ese SHA (§2.5) y las etiqueta como `:latest` y `:$sha` localmente. No reconstruye nada en el servidor.
 5. Si el cambio trae migraciones, pone la aplicación en `artisan down`.
 6. Recrea solo los servicios de la aplicación (`--force-recreate --no-deps`). La base, Redis y phpMyAdmin no se reinician.
 7. Ejecuta `migrate --force`, luego `artisan up` y `restart nginx`.
@@ -29,6 +40,8 @@ merge a main ──► CI otra vez sobre el commit de main
 9. Guarda el SHA desplegado en `/var/lib/credits-manager/desplegado` y conserva las imágenes de los últimos 5 despliegues.
 
 Si una migración falla, la aplicación **queda en mantenimiento a propósito**: una base a medio migrar no debe atender usuarios. El log del workflow indica cómo seguir.
+
+**Si falla después del paso 6 y NO hay migración a medias** (paso 8 no responde 200, por ejemplo), el script revierte solo: vuelve a etiquetar la imagen anterior como `:latest`, recrea los contenedores y verifica de nuevo. Si la reversión también falla, lo dice en el log para intervención manual — nunca deja una base a medio migrar sin avisar (si hay migración de por medio, no revierte sola: ver §3.1).
 
 > `podman-compose` no recrea un contenedor con `up -d` si solo cambió la imagen; por eso el script usa `--force-recreate`. Lo mismo aplica a un despliegue manual.
 
@@ -138,16 +151,54 @@ En `github.com/Innoval-Tech-SAS/credits-manager` → **Settings → Environments
 
 - *Require a pull request before merging*.
 - *Require status checks to pass* con estos checks (aparecen después de la primera ejecución del CI):
-  `API (Pint + PHPUnit)`, `Migraciones en MySQL 8.4`, `Cliente (lint + pruebas + build)`, `Imágenes de producción`.
+  `API (Pint + PHPUnit)`, `Migraciones en MySQL 8.4`, `Cliente (lint + pruebas + build)`, `Imágenes de producción`, `Shellcheck (scripts)`.
 - *Block force pushes*.
 
-### 2.5. Primer despliegue
+`CodeQL` (workflow aparte, `.github/workflows/codeql.yml`) **no** está en esta lista a propósito: es un análisis de seguridad informativo, no bloqueante. Si en algún momento se quiere que también bloquee el merge, agregar el check `Analizar (php)` y `Analizar (javascript-typescript)` aquí.
+
+### 2.5. GHCR: autenticación del servidor para descargar imágenes
+
+`scripts/deploy.sh` descarga las imágenes de `ghcr.io/innoval-tech-sas/credits-manager-{api,nginx}` en vez de construirlas (§1): el CI las publica ahí en cada push a `main`, autenticado con el `GITHUB_TOKEN` efímero del propio workflow. El **servidor** necesita su propia credencial, de una sola vez, para poder hacer `podman pull` de un paquete privado:
+
+1. En GitHub: perfil → **Settings → Developer settings → Personal access tokens → Tokens (classic)** → *Generate new token*, con el único scope `read:packages`. Sin fecha de expiración corta (si expira, los despliegues empiezan a fallar en el paso 4 sin aviso previo — ponle un recordatorio de renovación en el calendario en vez de "sin expiración").
+2. Como root en el servidor:
+
+   ```bash
+   echo '<el token>' | podman login ghcr.io -u <tu-usuario-de-github> --password-stdin
+   ```
+
+   Queda guardado en `/root/.config/containers/auth.json`; `podman pull` lo usa solo, sin que `deploy.sh` tenga que pasar ningún secreto.
+3. Comprueba: `podman pull ghcr.io/innoval-tech-sas/credits-manager-api:latest` (falla si aún no hay ninguna imagen publicada — normal antes del primer despliegue con este flujo).
+
+Si el login expira o se revoca, `deploy.sh` falla en el paso 4 con un mensaje que apunta aquí; repite el paso 2 con un token nuevo.
+
+Si el job "Imágenes de producción" falla al publicar (no al construir ni al escanear) la primera vez, revisa en la organización **Settings → Packages → Package creation** que no esté restringido a quién puede crear paquetes nuevos desde Actions — por defecto no lo está.
+
+### 2.6. Verificación periódica de respaldos
+
+`scripts/verificar-respaldo.sh` restaura el respaldo diario más reciente en una base temporal del mismo servidor MySQL (nunca toca la base en uso) y confirma que generó tablas. Un respaldo que nunca se prueba no es un respaldo confiable.
+
+Como root en el servidor:
+
+```bash
+install -o root -g root -m 0755 /root/repositories/credits-manager/scripts/verificar-respaldo.sh \
+  /usr/local/sbin/credits-manager-verificar-respaldo
+
+cat >/etc/cron.d/credits-manager-verificar-respaldo <<'EOF'
+0 4 * * 0 root /usr/local/sbin/credits-manager-verificar-respaldo >> /var/log/credits-manager-verificar-respaldo.log 2>&1
+EOF
+```
+
+Corre los domingos a las 4am (fuera de la ventana de respaldo automático de la 1am, y fuera de horas de uso). Igual que `deploy.sh`, hay que reinstalar la copia si el script cambia en el repositorio. Revisa `/var/log/credits-manager-verificar-respaldo.log` o conecta el log a tu alerta de monitoreo habitual — el script no manda alertas por sí solo, solo escribe en el log y sale con código distinto de cero si algo falla.
+
+### 2.7. Primer despliegue
 
 El primer despliegue construye `localhost/credits-manager-nginx`, un nombre de imagen nuevo. Es normal que tarde más.
 
-1. Haz merge del PR que trae este CI/CD.
-2. Ve a **Actions → Deploy**. Cuando el CI de `main` termine, el despliegue arranca solo; sigue el log.
-3. Si el CI de ese primer commit falla (por ejemplo, Pint encuentra estilo pendiente), corrígelo en otro PR. El despliegue solo corre con el CI en verde.
+1. Completa §2.5 (login de `podman` a GHCR) — sin esto el primer despliegue falla al intentar descargar la imagen.
+2. Haz merge del PR que trae este CI/CD.
+3. Ve a **Actions → Deploy**. Cuando el CI de `main` termine, el despliegue arranca solo; sigue el log.
+4. Si el CI de ese primer commit falla (por ejemplo, Pint encuentra estilo pendiente), corrígelo en otro PR. El despliegue solo corre con el CI en verde.
 
 ---
 
@@ -164,7 +215,7 @@ El primer despliegue construye `localhost/credits-manager-nginx`, un nombre de i
 
 **Sin migraciones de por medio**, la vía normal es un PR con `git revert` del commit: al hacer merge, el pipeline despliega la versión revertida.
 
-Si no puedes esperar al CI, vuelve a la imagen anterior a mano (SHA en `/var/lib/credits-manager/historial`) y después haz igual el PR de revert, para que `main` coincida con lo desplegado:
+Si el despliegue falla después de recrear los contenedores (por ejemplo, el health check del paso 8 no responde 200) y no hay migración a medias, `deploy.sh` ya revierte solo (§1) — normalmente no hace falta nada de esto. Lo de abajo es para cuando esa reversión automática también falló, o para revertir sin esperar a que `main` tenga un commit nuevo:
 
 ```bash
 cd /root/repositories/credits-manager
