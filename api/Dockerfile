@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
 COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
-FROM docker.io/library/php:8.4-fpm-alpine
+FROM docker.io/library/php:8.5-fpm-alpine
 WORKDIR /var/www/html
 
 RUN apk upgrade --no-cache \
