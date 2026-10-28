@@ -17,8 +17,43 @@ env:
   PHP_EXTENSIONS: mbstring, bcmath, intl, zip, gd, pdo_mysql, pdo_sqlite, redis, pcntl
 
 jobs:
+  cambios:
+    name: Detectar cambios
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      api: ${{ steps.filtro.outputs.api }}
+      client: ${{ steps.filtro.outputs.client }}
+      docker: ${{ steps.filtro.outputs.docker }}
+      scripts: ${{ steps.filtro.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        id: filtro
+        with:
+          filters: |
+            api:
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+            client:
+              - 'client/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - 'api/Dockerfile'
+              - 'nginx/Dockerfile'
+              - 'docker-compose.yaml'
+              - 'api/**'
+              - 'client/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
+
   api:
     name: API (Pint + PHPUnit)
+    needs: cambios
+    if: needs.cambios.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -33,18 +68,18 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           extensions: ${{ env.PHP_EXTENSIONS }}
           # Mismos límites que la imagen (api/docker/php/uploads.ini).
           ini-values: upload_max_filesize=20M, post_max_size=21M
-          coverage: none
+          coverage: pcov
 
       - name: Caché de Composer
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/composer/files
           key: composer-${{ hashFiles('api/composer.lock') }}
@@ -52,18 +87,31 @@ jobs:
 
       - run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Dependencias vulnerables (composer audit)
+        run: composer audit
+
       - name: Estilo (Pint)
         run: vendor/bin/pint --test
 
       - name: Pruebas (PHPUnit)
-        run: vendor/bin/phpunit --no-coverage
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml --coverage-text
         env:
           REDIS_HOST: 127.0.0.1
+
+      - name: Reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cobertura-api
+          path: api/coverage.xml
+          retention-days: 14
 
   migraciones:
     # Las pruebas usan SQLite; este job corre todas las migraciones contra MySQL 8.4,
     # igual que producción (triggers de solo inserción incluidos).
     name: Migraciones en MySQL 8.4
+    needs: cambios
+    if: needs.cambios.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -94,16 +142,16 @@ jobs:
       QUEUE_CONNECTION: sync
       BROADCAST_CONNECTION: "null"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           extensions: ${{ env.PHP_EXTENSIONS }}
           coverage: none
 
       - name: Caché de Composer
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/composer/files
           key: composer-${{ hashFiles('api/composer.lock') }}
@@ -125,54 +173,112 @@ jobs:
 
   client:
     name: Cliente (lint + pruebas + build)
+    needs: cambios
+    if: needs.cambios.outputs.client == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Misma versión que nginx/Dockerfile.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.13.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: client/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
+      - name: Dependencias vulnerables (pnpm audit)
+        run: pnpm audit --audit-level high
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
 
   imagenes:
-    # Confirma que las imágenes de producción construyen; no publica nada.
+    # Construye las imágenes de producción. En push a main (no en PR) también las publica en
+    # ghcr.io etiquetadas por SHA: scripts/deploy.sh las descarga en vez de reconstruirlas
+    # (docs/ci-cd.md §2.5) — garantiza que lo desplegado es bit a bit lo que pasó CI.
     name: Imágenes de producción
+    needs: cambios
+    if: needs.cambios.outputs.docker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # push: false siempre aquí — escanea antes de publicar, nunca al revés. Si Trivy encuentra
+      # CRITICAL/HIGH la imagen nunca llega a ghcr.io.
       - name: Imagen api
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: api
           file: api/Dockerfile
           push: false
+          load: true
+          tags: ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
       - name: Imagen nginx (incluye la SPA)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: nginx/Dockerfile
           push: false
+          load: true
+          tags: ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,mode=max,scope=nginx
+
+      - name: Escaneo de vulnerabilidades (Trivy) — api
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Escaneo de vulnerabilidades (Trivy) — nginx
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Login en ghcr.io
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar imágenes (solo push a main)
+        if: github.event_name == 'push'
+        run: |
+          docker push ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
+          docker push ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
+
+  shellcheck:
+    # scripts/deploy.sh y verificar-respaldo.sh tocan producción directamente; nadie más los lintea.
+    name: Shellcheck (scripts)
+    needs: cambios
+    if: needs.cambios.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: shellcheck scripts/*.sh

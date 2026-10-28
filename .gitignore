@@ -4,6 +4,7 @@ certbot/www/
 .claude
 .github/*
 !.github/workflows/
+!.github/dependabot.yml
 .agents
 .vscode/
 .pnpm-store/
