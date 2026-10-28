@@ -14,7 +14,7 @@ class SubirLogoEmpresaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'logo' => ['required', 'image:allow_svg', 'mimes:png,jpg,jpeg,webp,gif,svg', 'max:2048'],
+            'logo' => ['required', 'image:allow_svg', 'mimes:png,jpg,jpeg,gif,svg', 'max:2048'],
         ];
     }
 }

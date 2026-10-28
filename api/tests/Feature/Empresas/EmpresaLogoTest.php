@@ -41,6 +41,15 @@ class EmpresaLogoTest extends TestCase
         Storage::disk('public')->assertExists(str_replace('storage/', '', $empresa['logo_pdf_path']));
     }
 
+    public function test_subir_un_webp_se_rechaza(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->create('logo.webp', 10, 'image/webp')])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('logo');
+    }
+
     public function test_sin_sesion_no_hay_respuesta(): void
     {
         $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png')])->assertUnauthorized();
