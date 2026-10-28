@@ -225,4 +225,63 @@ class MetasHttpTest extends TestCase
 
         $this->assertSame(0, ConfiguracionMeta::query()->count());
     }
+
+    public function test_eliminar_meta_sin_sesion_responde_401(): void
+    {
+        $this->actingAsAdmin();
+        $meta = $this->crearMeta('2026-10', TipoMeta::Colocacion, 1000000);
+        $this->salirDeSesion();
+
+        $this->deleteJson("/api/v1/metas/{$meta->id}")->assertUnauthorized();
+    }
+
+    public function test_asesor_no_puede_eliminar_metas(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $meta = $this->crearMeta('2026-10', TipoMeta::Colocacion, 1000000);
+        $this->actingAsAsesor(Empresa::findOrFail($admin->empresa_id));
+
+        $this->deleteJson("/api/v1/metas/{$meta->id}")->assertForbidden();
+        $this->assertNotSoftDeleted('metas', ['id' => $meta->id], null, 'borrado_en');
+    }
+
+    public function test_eliminar_meta_inexistente_responde_404(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->deleteJson('/api/v1/metas/999999')->assertNotFound();
+    }
+
+    public function test_eliminar_meta_la_borra_con_su_distribucion_y_registra_en_bitacora(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $meta = $this->crearMeta('2026-10', TipoMeta::Colocacion, 1000000);
+        $fila = $this->distribuirMeta($meta, $this->crearAsesor(Empresa::findOrFail($admin->empresa_id)), 600000);
+
+        $this->deleteJson("/api/v1/metas/{$meta->id}")->assertNoContent();
+
+        $this->assertSoftDeleted('metas', ['id' => $meta->id], null, 'borrado_en');
+        $this->assertSoftDeleted('metas_asesor', ['id' => $fila->id], null, 'borrado_en');
+        $this->assertEventoAuditoria('eliminar', 'metas', 'meta', $meta->id);
+    }
+
+    public function test_una_meta_eliminada_se_puede_volver_a_crear_en_el_mismo_periodo(): void
+    {
+        $this->actingAsAdmin();
+        $meta = $this->crearMeta('2026-10', TipoMeta::Colocacion, 1000000);
+        $this->deleteJson("/api/v1/metas/{$meta->id}")->assertNoContent();
+
+        $this->postJson('/api/v1/metas', ['periodo' => '2026-10', 'tipo' => 'colocacion', 'valor_objetivo' => 2000000])->assertCreated();
+    }
+
+    public function test_un_admin_no_puede_eliminar_una_meta_de_otra_empresa(): void
+    {
+        $this->actingAsAdmin();
+        $ajena = $this->crearMeta('2026-10', TipoMeta::Colocacion, 1000000);
+
+        $this->actingAsAdmin();
+
+        $this->deleteJson("/api/v1/metas/{$ajena->id}")->assertNotFound();
+        $this->assertNotSoftDeleted('metas', ['id' => $ajena->id], null, 'borrado_en');
+    }
 }

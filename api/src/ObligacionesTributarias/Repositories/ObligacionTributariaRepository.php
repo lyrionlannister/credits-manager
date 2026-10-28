@@ -30,6 +30,11 @@ class ObligacionTributariaRepository extends BaseRepository
             ->get();
     }
 
+    public function existenDeTipo(int $tipoId): bool
+    {
+        return $this->consulta()->where('tipo_obligacion_id', $tipoId)->exists();
+    }
+
     /** Explícito por empresa: el comando diario no tiene sesión, así que el scope no filtra por él. */
     public function pendientesDeEmpresa(int $empresaId): Collection
     {

@@ -14,24 +14,40 @@ class ValorUvtRepository extends BaseRepository
         parent::__construct($valorUvt);
     }
 
-    public function todos(): Collection
+    public function todas(): Collection
     {
-        return $this->consulta()->orderByDesc('anio')->get();
+        return $this->consulta()->orderByDesc('fecha_desde')->get();
     }
 
-    public function paraAnio(int $anio): ?ValorUvt
+    public function vigenteParaFecha(string $fecha): ?ValorUvt
     {
-        return $this->consulta()->where('anio', $anio)->first();
+        return $this->consulta()
+            ->where('fecha_desde', '<=', $fecha)
+            ->where(fn ($query) => $query->whereNull('fecha_hasta')->orWhere('fecha_hasta', '>=', $fecha))
+            ->first();
     }
 
-    public function guardar(int $anio, float $valor): ValorUvt
+    /** La vigencia sin fecha de cierre, si existe (la que hay que cerrar al crear una nueva). */
+    public function abierta(): ?ValorUvt
     {
-        return $this->consulta()->updateOrCreate(['anio' => $anio], ['valor' => $valor]);
+        return $this->consulta()->whereNull('fecha_hasta')->first();
     }
 
-    /** Protege el valor si la propia empresa ya causó un gasto con fecha de ese año. */
-    public function tieneGastosEnAnio(int $anio): bool
+    public function existeEnRangoCerrado(string $fechaDesde): bool
     {
-        return Gasto::whereYear('fecha', $anio)->exists();
+        return $this->consulta()
+            ->whereNotNull('fecha_hasta')
+            ->where('fecha_desde', '<=', $fechaDesde)
+            ->where('fecha_hasta', '>=', $fechaDesde)
+            ->exists();
+    }
+
+    /** Si ya hay un gasto causado con fecha dentro del rango de vigencia de este valor, queda protegido. */
+    public function tieneUso(ValorUvt $valorUvt): bool
+    {
+        return Gasto::query()
+            ->where('fecha', '>=', $valorUvt->fecha_desde->toDateString())
+            ->when($valorUvt->fecha_hasta, fn ($query) => $query->where('fecha', '<=', $valorUvt->fecha_hasta->toDateString()))
+            ->exists();
     }
 }

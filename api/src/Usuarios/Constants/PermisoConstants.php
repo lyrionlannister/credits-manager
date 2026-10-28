@@ -219,10 +219,13 @@ class PermisoConstants
         'metas.listar' => 'Ver metas de todos los asesores',
         'metas.configurar' => 'Configurar y distribuir metas',
         'metas.recalcular' => 'Recalcular cierres de metas',
+        'metas.eliminar' => 'Eliminar metas',
         'obligaciones_tributarias.listar' => 'Ver calendario tributario',
         'obligaciones_tributarias.configurar' => 'Configurar tipos de obligación',
         'obligaciones_tributarias.crear' => 'Crear obligaciones',
         'obligaciones_tributarias.editar' => 'Editar obligaciones',
         'obligaciones_tributarias.cambiar_estado' => 'Cambiar el estado de una obligación',
+        'obligaciones_tributarias.eliminar' => 'Eliminar obligaciones',
+        'obligaciones_tributarias.eliminar_tipos' => 'Eliminar tipos de obligación',
     ];
 }

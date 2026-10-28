@@ -6,6 +6,7 @@ import { FileText, Pencil, Trash2 } from 'lucide-react';
 import { useLocationSuccessMessage } from '../../shared/hooks/use-location-success-message';
 import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
+import { formatDateEs } from '../../shared/utils/format-date-es';
 import { formatMoney } from '../../shared/utils/format-money';
 import { usePermission } from '../../auth/hooks/use-permission';
 import { ActionButton } from '@ui/action-button/components/action-button';
@@ -53,7 +54,7 @@ export const UvtValuesPage: FC = () => {
             onDismissSuccess={() => setSuccessMessage(null)}
             errorMessage={error}
             onDismissError={() => setError(null)}
-            countLabel={`${valoresUvt.length} ${valoresUvt.length === 1 ? 'año registrado' : 'años registrados'}`}
+            countLabel={`${valoresUvt.length} ${valoresUvt.length === 1 ? 'valor registrado' : 'valores registrados'}`}
             toolbar={
                 canCreate && (
                     <Button collapseBelow="md" startIcon={<FileText className="size-4" />} onClick={() => navigate('/gastos/valores-uvt/crear')}>
@@ -68,7 +69,7 @@ export const UvtValuesPage: FC = () => {
                     onConfirm={() => void confirmarEliminar()}
                     variant="danger"
                     title="Eliminar valor UVT"
-                    description={`El valor UVT del año ${porEliminar?.anio} se eliminará. Esta acción no se puede deshacer.`}
+                    description={`El valor UVT vigente desde ${porEliminar ? formatDateEs(porEliminar.fecha_desde) : ''} se eliminará. Esta acción no se puede deshacer.`}
                     confirmLabel="Eliminar"
                     isConfirming={isLoading}
                 />
@@ -76,7 +77,8 @@ export const UvtValuesPage: FC = () => {
         >
             <DataTable<ApiUvtValue>
                 columns={[
-                    { key: 'anio', label: 'Año' },
+                    { key: 'fecha_desde', label: 'Vigente desde', render: (valorUvt) => formatDateEs(valorUvt.fecha_desde) },
+                    { key: 'fecha_hasta', label: 'Vigente hasta', render: (valorUvt) => (valorUvt.fecha_hasta ? formatDateEs(valorUvt.fecha_hasta) : 'Vigente') },
                     { key: 'valor', label: 'Valor UVT', render: (valorUvt) => formatMoney(valorUvt.valor) },
                     ...(canEdit || canDelete
                         ? [

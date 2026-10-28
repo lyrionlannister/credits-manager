@@ -101,10 +101,10 @@ export const IMPORT_EXAMPLE_BY_TYPE: Record<ImportType, { columns: { key: string
     },
     valores_uvt: {
         columns: [
-            { key: 'anio', label: 'Año' },
+            { key: 'fecha_desde', label: 'Fecha desde' },
             { key: 'valor', label: 'Valor UVT' },
         ],
-        example: { anio: '2024', valor: '46700' },
+        example: { fecha_desde: '01/01/2024', valor: '46700' },
     },
     tarifas_reteica: {
         columns: [

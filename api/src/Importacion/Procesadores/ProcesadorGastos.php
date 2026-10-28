@@ -134,8 +134,8 @@ final class ProcesadorGastos implements ProcesadorFila
             throw new FilaRechazada('El tipo de gasto no tiene parametrización vigente en esa fecha.', 'fecha');
         }
 
-        if (! $this->valoresUvt->paraAnio((int) date('Y', strtotime($fecha)))) {
-            throw new FilaRechazada('No hay valor UVT configurado para el año de la fecha.', 'fecha');
+        if (! $this->valoresUvt->vigenteParaFecha($fecha)) {
+            throw new FilaRechazada('No hay valor UVT vigente para la fecha.', 'fecha');
         }
     }
 }

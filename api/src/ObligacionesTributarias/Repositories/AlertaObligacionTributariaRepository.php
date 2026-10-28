@@ -28,6 +28,12 @@ class AlertaObligacionTributariaRepository extends BaseRepository
         $this->consulta()->insertOrIgnore($datos);
     }
 
+    /** Soft delete en lote: la alerta no tiene sentido sin su obligación y el listado la cargaría con `obligacion` nula. */
+    public function eliminarDeObligacion(int $obligacionId): void
+    {
+        $this->consulta()->where('obligacion_id', $obligacionId)->delete();
+    }
+
     public function deEmpresa(int $empresaId): Collection
     {
         return $this->consulta()

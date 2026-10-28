@@ -15,6 +15,7 @@ use App\Metas\Requests\ListarMetasRequest;
 use App\Metas\Services\MetaService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class MetaController extends Controller
 {
@@ -55,5 +56,12 @@ class MetaController extends Controller
         ], $peticion->validated('asesores'));
 
         return response()->json(['meta' => $this->metas->distribuir($peticion->user(), $meta, $filas)]);
+    }
+
+    public function destroy(Meta $meta): Response
+    {
+        $this->metas->eliminar($meta);
+
+        return response()->noContent();
     }
 }

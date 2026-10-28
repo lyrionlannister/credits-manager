@@ -6,6 +6,7 @@ use App\Auditoria\Services\EmisorAuditoria;
 use App\ObligacionesTributarias\Constants\ObligacionesTributariasConstants;
 use App\ObligacionesTributarias\Enums\EstadoObligacionTributaria;
 use App\ObligacionesTributarias\Models\ObligacionTributaria;
+use App\ObligacionesTributarias\Repositories\AlertaObligacionTributariaRepository;
 use App\ObligacionesTributarias\Repositories\ObligacionTributariaRepository;
 use App\Usuarios\Constants\UsuarioConstants;
 use App\Usuarios\Models\Usuario;
@@ -13,6 +14,7 @@ use App\Usuarios\Repositories\UsuarioRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ObligacionTributariaService
 {
@@ -21,6 +23,7 @@ class ObligacionTributariaService
 
     public function __construct(
         protected ObligacionTributariaRepository $obligaciones,
+        protected AlertaObligacionTributariaRepository $alertas,
         protected UsuarioRepository $usuarios,
         protected EmisorAuditoria $auditoria,
     ) {}
@@ -106,6 +109,27 @@ class ObligacionTributariaService
             );
 
             return $this->representar($obligacion->load(['tipoObligacion', 'responsable']), CarbonImmutable::now());
+        });
+    }
+
+    /** Una obligación cumplida es evidencia del control tributario: se conserva. */
+    public function eliminar(ObligacionTributaria $obligacion): void
+    {
+        if ($obligacion->estado === EstadoObligacionTributaria::Cumplida) {
+            throw ValidationException::withMessages([
+                'obligacion' => __('validation.custom.obligaciones_tributarias.cumplida_no_eliminable'),
+            ]);
+        }
+
+        DB::transaction(function () use ($obligacion) {
+            $this->alertas->eliminarDeObligacion($obligacion->id);
+            $this->obligaciones->eliminar($obligacion);
+
+            $this->auditoria->registrarEliminacion(
+                ObligacionesTributariasConstants::MODULO,
+                "Obligación tributaria del período {$obligacion->periodo} eliminada",
+                $obligacion,
+            );
         });
     }
 

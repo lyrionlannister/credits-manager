@@ -9,6 +9,7 @@ use App\Metas\Constants\MetasConstants;
 use App\Metas\Data\PeriodoMeta;
 use App\Metas\Enums\TipoMeta;
 use App\Metas\Models\Meta;
+use App\Metas\Repositories\AlertaMetaRepository;
 use App\Metas\Repositories\CierreMetaRepository;
 use App\Metas\Repositories\MetaAsesorRepository;
 use App\Metas\Repositories\MetaRepository;
@@ -23,6 +24,7 @@ class MetaService
         protected MetaRepository $metas,
         protected MetaAsesorRepository $asesores,
         protected CierreMetaRepository $cierres,
+        protected AlertaMetaRepository $alertas,
         protected CumplimientoMetasService $cumplimiento,
         protected ConfiguracionMetasService $configuracion,
         protected EmisorAuditoria $auditoria,
@@ -146,6 +148,31 @@ class MetaService
             }
 
             return $meta->fresh(['asesores']);
+        });
+    }
+
+    /**
+     * Solo una meta sin cierres: un cierre es el resultado oficial del período. Se bloquea la fila primero, igual que
+     * el cierre y el recálculo, para que un cierre en curso no se cruce con el borrado.
+     */
+    public function eliminar(Meta $meta): void
+    {
+        DB::transaction(function () use ($meta) {
+            $meta = $this->metas->bloquear($meta);
+
+            if ($this->cierres->tieneCierres((int) $meta->empresa_id, $meta->id)) {
+                throw ValidationException::withMessages(['meta' => __('validation.custom.metas.tiene_cierres')]);
+            }
+
+            $this->asesores->eliminarDeMeta($meta->id);
+            $this->alertas->eliminarDeMeta($meta->id);
+            $this->metas->eliminar($meta);
+
+            $this->auditoria->registrarEliminacion(
+                MetasConstants::MODULO,
+                "Meta de {$meta->tipo->value} del período {$meta->periodo} eliminada",
+                $meta,
+            );
         });
     }
 

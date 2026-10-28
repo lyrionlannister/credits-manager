@@ -9,10 +9,13 @@ import { useState } from 'react';
 
 import { usePermission } from '../../auth/hooks/use-permission';
 import { useResource } from '../../shared/hooks/use-resource';
+import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
+import { Alert } from '@ui/alert/components/alert';
 import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
+import { ConfirmModal } from '@ui/modal/components/confirm-modal';
 import { PageSkeleton } from '@ui/skeleton/components/page-skeleton';
-import { Settings2 } from 'lucide-react';
+import { Plus, Settings2 } from 'lucide-react';
 import { TaxObligationEventModal } from '../components/tax-obligation-event-modal';
 import { TaxObligationTypesModal } from '../components/tax-obligation-types-modal';
 import { TAX_OBLIGATION_LEGEND_ITEMS } from '../constants/tax-obligation-legend-items';
@@ -29,6 +32,11 @@ function mesActualEnCurso(): string {
 
 export const TaxObligationsPage: FC = () => {
     const puedeConfigurar = usePermission('obligaciones_tributarias', 'configurar');
+    const puedeCrear = usePermission('obligaciones_tributarias', 'crear');
+    const puedeEditar = usePermission('obligaciones_tributarias', 'editar');
+    const puedeCambiarEstado = usePermission('obligaciones_tributarias', 'cambiar_estado');
+    const puedeEliminar = usePermission('obligaciones_tributarias', 'eliminar');
+    const { sendRequest, isLoading: isDeleting } = useSendRequest();
 
     const [mes, setMes] = useState(mesActualEnCurso);
     const { data: respuesta, error, refetch } = useResource<{ data: ApiTaxObligation[] }>(`/obligaciones-tributarias?mes=${mes}`);
@@ -44,6 +52,8 @@ export const TaxObligationsPage: FC = () => {
     const [fechaNuevaObligacion, setFechaNuevaObligacion] = useState<string | null>(null);
     const [modalEventoAbierto, setModalEventoAbierto] = useState(false);
     const [modalTiposAbierto, setModalTiposAbierto] = useState(false);
+    const [obligacionPorEliminar, setObligacionPorEliminar] = useState<ApiTaxObligation | null>(null);
+    const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
     if (respuesta && respuesta.data !== obligacionesVisibles) {
         setObligacionesVisibles(respuesta.data);
@@ -55,10 +65,16 @@ export const TaxObligationsPage: FC = () => {
         setMes((actual) => (actual === nuevoMes ? actual : nuevoMes));
     };
 
-    const handleDateClick = (info: DateClickInfo) => {
+    const abrirNuevaObligacion = (fecha: string | null) => {
         setObligacionEnEdicion(null);
-        setFechaNuevaObligacion(info.dateStr);
+        setFechaNuevaObligacion(fecha);
         setModalEventoAbierto(true);
+    };
+
+    const handleDateClick = (info: DateClickInfo) => {
+        if (puedeCrear) {
+            abrirNuevaObligacion(info.dateStr);
+        }
     };
 
     const handleEventClick = (info: EventClickInfo) => {
@@ -71,6 +87,28 @@ export const TaxObligationsPage: FC = () => {
     const handleSaved = () => {
         setModalEventoAbierto(false);
         refetch();
+    };
+
+    const handleDelete = (obligacion: ApiTaxObligation) => {
+        setModalEventoAbierto(false);
+        setObligacionPorEliminar(obligacion);
+    };
+
+    const confirmarEliminar = async () => {
+        if (obligacionPorEliminar === null) {
+            return;
+        }
+
+        setErrorEliminar(null);
+
+        try {
+            await sendRequest(`/obligaciones-tributarias/${obligacionPorEliminar.id}`, { method: 'DELETE' });
+            refetch();
+        } catch (caught) {
+            setErrorEliminar(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
+        } finally {
+            setObligacionPorEliminar(null);
+        }
     };
 
     const renderEventContent = (eventInfo: EventDisplayInfo) => {
@@ -112,12 +150,25 @@ export const TaxObligationsPage: FC = () => {
                     ))}
                 </div>
 
-                {puedeConfigurar && (
-                    <Button variant="outline" collapseBelow="md" startIcon={<Settings2 className="size-4" />} onClick={() => setModalTiposAbierto(true)}>
-                        Tipos de obligación
-                    </Button>
-                )}
+                <div className="flex items-center gap-3">
+                    {puedeConfigurar && (
+                        <Button variant="outline" collapseBelow="md" startIcon={<Settings2 className="size-4" />} onClick={() => setModalTiposAbierto(true)}>
+                            Tipos de obligación
+                        </Button>
+                    )}
+                    {puedeCrear && (
+                        <Button collapseBelow="md" startIcon={<Plus className="size-4" />} onClick={() => abrirNuevaObligacion(null)}>
+                            Nueva obligación
+                        </Button>
+                    )}
+                </div>
             </div>
+
+            {errorEliminar && (
+                <div className="mb-4">
+                    <Alert variant="danger" title="No se pudo eliminar la obligación" message={errorEliminar} onDismiss={() => setErrorEliminar(null)} />
+                </div>
+            )}
 
             <div className="custom-calendar overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <FullCalendar
@@ -146,8 +197,23 @@ export const TaxObligationsPage: FC = () => {
                 fechaInicial={fechaNuevaObligacion}
                 tipos={tipos}
                 responsables={responsables}
+                canEdit={puedeEditar}
+                canChangeStatus={puedeCambiarEstado}
+                canDelete={puedeEliminar}
                 onClose={() => setModalEventoAbierto(false)}
                 onSaved={handleSaved}
+                onDelete={handleDelete}
+            />
+
+            <ConfirmModal
+                isOpen={obligacionPorEliminar !== null}
+                onClose={() => setObligacionPorEliminar(null)}
+                onConfirm={() => void confirmarEliminar()}
+                variant="danger"
+                title="Eliminar obligación tributaria"
+                description={`La obligación ${obligacionPorEliminar?.tipo_obligacion.nombre ?? ''} del período ${obligacionPorEliminar?.periodo ?? ''} se eliminará del calendario.`}
+                confirmLabel="Eliminar"
+                isConfirming={isDeleting}
             />
 
             <TaxObligationTypesModal isOpen={modalTiposAbierto} onClose={() => setModalTiposAbierto(false)} onChanged={refetchTipos} />

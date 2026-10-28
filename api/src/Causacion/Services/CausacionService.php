@@ -36,7 +36,7 @@ class CausacionService
     ) {}
 
     /**
-     * Resuelve la parametrización vigente, la UVT del año y (si aplica) la tarifa ReteICA, y evalúa el motor
+     * Resuelve la parametrización vigente, la UVT vigente y (si aplica) la tarifa ReteICA, y evalúa el motor
      * fiscal. Lanza las mismas `ValidationException` que ya usaba `GastoService::causar()`.
      *
      * @return array{parametrizacion: ParametrizacionTipoGasto, calculo: array, retenciones_por_tipo: Collection}
@@ -50,7 +50,7 @@ class CausacionService
             ]);
         }
 
-        $uvt = $this->valoresUvt->paraAnio((int) date('Y', strtotime($fecha)));
+        $uvt = $this->valoresUvt->vigenteParaFecha($fecha);
         if (! $uvt) {
             throw ValidationException::withMessages([
                 'fecha' => __('validation.custom.valor_uvt.no_configurado'),

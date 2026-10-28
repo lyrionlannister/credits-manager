@@ -5,15 +5,18 @@ namespace App\ObligacionesTributarias\Services;
 use App\Auditoria\Services\EmisorAuditoria;
 use App\ObligacionesTributarias\Constants\ObligacionesTributariasConstants;
 use App\ObligacionesTributarias\Models\TipoObligacionTributaria;
+use App\ObligacionesTributarias\Repositories\ObligacionTributariaRepository;
 use App\ObligacionesTributarias\Repositories\TipoObligacionTributariaRepository;
 use App\Usuarios\Models\Usuario;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TipoObligacionTributariaService
 {
     public function __construct(
         protected TipoObligacionTributariaRepository $tipos,
+        protected ObligacionTributariaRepository $obligaciones,
         protected EmisorAuditoria $auditoria,
     ) {}
 
@@ -51,6 +54,26 @@ class TipoObligacionTributariaService
             );
 
             return $tipo;
+        });
+    }
+
+    /** Con obligaciones registradas el tipo se desactiva, no se borra: el historial del calendario lo sigue mostrando. */
+    public function eliminar(TipoObligacionTributaria $tipo): void
+    {
+        if ($this->obligaciones->existenDeTipo($tipo->id)) {
+            throw ValidationException::withMessages([
+                'tipo' => __('validation.custom.obligaciones_tributarias.tipo_con_obligaciones'),
+            ]);
+        }
+
+        DB::transaction(function () use ($tipo) {
+            $this->tipos->eliminar($tipo);
+
+            $this->auditoria->registrarEliminacion(
+                ObligacionesTributariasConstants::MODULO,
+                "Tipo de obligación tributaria «{$tipo->nombre}» eliminado",
+                $tipo,
+            );
         });
     }
 }
