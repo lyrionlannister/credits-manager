@@ -28,8 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - language: php
-            build-mode: none
+          # CodeQL todavía no reconoce "php" como lenguaje (CLI 2.27.3): solo TS/JS por ahora.
           - language: javascript-typescript
             build-mode: none
     steps:

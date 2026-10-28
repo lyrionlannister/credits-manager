@@ -14,7 +14,7 @@ PR hacia main ──► CI (.github/workflows/ci.yml)
                   Branch protection: sin los 4 checks originales en verde no se puede hacer merge (§2.4).
                   Un job que no corre por el filtro queda "skipped": GitHub lo cuenta como pasado para el check requerido.
 
-             ──► CodeQL (.github/workflows/codeql.yml): análisis de seguridad estático, PHP + TS,
+             ──► CodeQL (.github/workflows/codeql.yml): análisis de seguridad estático (JS/TS — CodeQL aún no reconoce PHP),
                   en cada PR/push y además una vez por semana. No es un check requerido todavía (§2.4).
 
 merge a main ──► CI otra vez sobre el commit de main
