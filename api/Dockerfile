@@ -14,7 +14,8 @@ RUN composer dump-autoload --optimize --no-dev
 FROM docker.io/library/php:8.4-fpm-alpine
 WORKDIR /var/www/html
 
-RUN apk add --no-cache icu-dev libzip-dev oniguruma-dev libpng-dev libjpeg-turbo-dev mysql-client mariadb-connector-c \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache icu-dev libzip-dev oniguruma-dev libpng-dev libjpeg-turbo-dev mysql-client mariadb-connector-c \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install pdo_mysql mbstring bcmath intl zip opcache pcntl posix gd \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \

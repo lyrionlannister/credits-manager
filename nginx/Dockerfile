@@ -25,6 +25,8 @@ RUN pnpm run build
 
 FROM docker.io/library/nginx:alpine
 
+RUN apk upgrade --no-cache
+
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 COPY api/public /var/www/html/public
 RUN ln -sf /var/www/html/storage/app/public /var/www/html/public/storage
