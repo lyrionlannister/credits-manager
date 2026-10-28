@@ -17,8 +17,11 @@ URL_API=https://api.ddasolucionescredicias.tech/up
 URL_APP=https://app.ddasolucionescredicias.tech/
 IMG_API=localhost/credits-manager-api
 IMG_NGINX=localhost/credits-manager-nginx
-GHCR_API=ghcr.io/innoval-tech-sas/credits-manager-api
-GHCR_NGINX=ghcr.io/innoval-tech-sas/credits-manager-nginx
+# Namespace de ghcr.io sacado del remoto real (github.com:<owner>/<repo>.git), no hardcodeado:
+# el CI publica bajo el owner real del repo (github.repository_owner), y aquí tiene que coincidir.
+GHCR_NS="$(git -C "$REPO_DIR" remote get-url origin | sed -E 's#.*[:/]([^/]+)/[^/.]+(\.git)?$#\1#' | tr '[:upper:]' '[:lower:]')"
+GHCR_API="ghcr.io/$GHCR_NS/credits-manager-api"
+GHCR_NGINX="ghcr.io/$GHCR_NS/credits-manager-nginx"
 IMAGENES_CONSERVADAS=5
 
 # Todo lo que corre con la imagen propia. database, redis y phpmyadmin no se tocan.
