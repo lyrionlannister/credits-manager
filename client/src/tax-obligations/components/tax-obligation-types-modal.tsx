@@ -1,7 +1,8 @@
 import type { FC, SubmitEvent } from 'react';
 import { useState } from 'react';
 
-import { Pencil, Tag } from 'lucide-react';
+import { Pencil, Tag, Trash2 } from 'lucide-react';
+import { usePermission } from '../../auth/hooks/use-permission';
 import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { ActionButton } from '@ui/action-button/components/action-button';
@@ -9,6 +10,7 @@ import { Button } from '@ui/button/components/button';
 import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Select } from '@ui/forms/components/select';
+import { ConfirmModal } from '@ui/modal/components/confirm-modal';
 import { Modal } from '@ui/modal/components/modal';
 import { Spinner } from '@ui/spinner/components/spinner';
 import { DataTable } from '@ui/table/components/data-table';
@@ -23,7 +25,8 @@ const PERIODICITY_LABELS: Record<ApiTaxObligationPeriodicity, string> = Object.f
 ) as Record<ApiTaxObligationPeriodicity, string>;
 
 export const TaxObligationTypesModal: FC<TaxObligationTypesModalProps> = ({ isOpen, onClose, onChanged }) => {
-    const { sendRequest } = useSendRequest();
+    const { sendRequest, isLoading: isDeleting } = useSendRequest();
+    const puedeEliminar = usePermission('obligaciones_tributarias', 'eliminar_tipos');
     const { data, isLoading, refetch } = useResource<{ data: ApiTaxObligationType[] }>(isOpen ? '/obligaciones-tributarias/tipos' : null);
     const tipos = data?.data ?? [];
 
@@ -33,6 +36,25 @@ export const TaxObligationTypesModal: FC<TaxObligationTypesModalProps> = ({ isOp
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [tipoEnEdicion, setTipoEnEdicion] = useState<ApiTaxObligationType | null>(null);
+    const [tipoPorEliminar, setTipoPorEliminar] = useState<ApiTaxObligationType | null>(null);
+
+    const confirmarEliminar = async () => {
+        if (tipoPorEliminar === null) {
+            return;
+        }
+
+        setError(null);
+
+        try {
+            await sendRequest(`/obligaciones-tributarias/tipos/${tipoPorEliminar.id}`, { method: 'DELETE' });
+            refetch();
+            onChanged();
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
+        } finally {
+            setTipoPorEliminar(null);
+        }
+    };
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -79,7 +101,14 @@ export const TaxObligationTypesModal: FC<TaxObligationTypesModalProps> = ({ isOp
         {
             key: 'acciones',
             label: 'Acciones',
-            render: (tipo) => <ActionButton icon={<Pencil className="size-4" />} label="Editar tipo" onClick={() => setTipoEnEdicion(tipo)} />,
+            render: (tipo) => (
+                <div className="flex items-center gap-3">
+                    <ActionButton icon={<Pencil className="size-4" />} label="Editar tipo" onClick={() => setTipoEnEdicion(tipo)} />
+                    {puedeEliminar && (
+                        <ActionButton icon={<Trash2 className="size-4" />} label="Eliminar tipo" variant="danger" onClick={() => setTipoPorEliminar(tipo)} />
+                    )}
+                </div>
+            ),
         },
     ];
 
@@ -160,6 +189,17 @@ export const TaxObligationTypesModal: FC<TaxObligationTypesModalProps> = ({ isOp
                     }}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={tipoPorEliminar !== null}
+                onClose={() => setTipoPorEliminar(null)}
+                onConfirm={() => void confirmarEliminar()}
+                variant="danger"
+                title="Eliminar tipo de obligación"
+                description={`El tipo «${tipoPorEliminar?.nombre}» se eliminará. Si ya tiene obligaciones registradas, desactívalo en su lugar.`}
+                confirmLabel="Eliminar"
+                isConfirming={isDeleting}
+            />
         </Modal>
     );
 };

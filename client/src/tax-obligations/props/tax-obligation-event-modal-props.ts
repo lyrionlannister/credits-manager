@@ -9,6 +9,12 @@ export type TaxObligationEventModalProps = {
     fechaInicial: string | null;
     tipos: ApiTaxObligationType[];
     responsables: ApiTaxObligationResponsible[];
+    /** Sin este permiso el evento se abre en solo lectura. */
+    canEdit: boolean;
+    canChangeStatus: boolean;
+    canDelete: boolean;
     onClose: () => void;
     onSaved: () => void;
+    /** El modal no confirma por sí mismo: lo hace la página con un `ConfirmModal`. */
+    onDelete: (obligacion: ApiTaxObligation) => void;
 };

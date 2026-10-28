@@ -1,7 +1,7 @@
 import type { FC, SubmitEvent } from 'react';
 import { useState } from 'react';
 
-import { Ban, CheckCircle2, Hash, RotateCcw } from 'lucide-react';
+import { Ban, CheckCircle2, Hash, RotateCcw, Trash2 } from 'lucide-react';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
 import { DatePicker } from '@ui/forms/components/date-picker';
@@ -21,19 +21,29 @@ const ESTADO_LABELS: Record<ApiTaxObligationStatus, string> = {
 };
 
 /** El formulario solo se monta mientras el modal está abierto: así el `useState` de cada campo arranca de nuevo entre un evento y otro, en vez de arrastrar el valor anterior. */
-export const TaxObligationEventModal: FC<TaxObligationEventModalProps> = ({ isOpen, obligacion, fechaInicial, tipos, responsables, onClose, onSaved }) => (
+export const TaxObligationEventModal: FC<TaxObligationEventModalProps> = ({ isOpen, onClose, ...props }) => (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-        {isOpen && (
-            <TaxObligationEventForm obligacion={obligacion} fechaInicial={fechaInicial} tipos={tipos} responsables={responsables} onClose={onClose} onSaved={onSaved} />
-        )}
+        {isOpen && <TaxObligationEventForm onClose={onClose} {...props} />}
     </Modal>
 );
 
 type TaxObligationEventFormProps = Omit<TaxObligationEventModalProps, 'isOpen'>;
 
-const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, fechaInicial, tipos, responsables, onClose, onSaved }) => {
+const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({
+    obligacion,
+    fechaInicial,
+    tipos,
+    responsables,
+    canEdit,
+    canChangeStatus,
+    canDelete,
+    onClose,
+    onSaved,
+    onDelete,
+}) => {
     const { sendRequest } = useSendRequest();
     const isEditMode = obligacion !== null;
+    const isReadOnly = isEditMode && !canEdit;
 
     const [tipoObligacionId, setTipoObligacionId] = useState('');
     const [periodo, setPeriodo] = useState(obligacion?.periodo ?? '');
@@ -103,10 +113,14 @@ const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, f
     return (
         <>
             <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                {isEditMode ? 'Editar obligación tributaria' : 'Nueva obligación tributaria'}
+                {isReadOnly ? 'Obligación tributaria' : isEditMode ? 'Editar obligación tributaria' : 'Nueva obligación tributaria'}
             </h4>
             <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-                {isEditMode ? 'Ajusta la fecha, el responsable o las observaciones.' : 'Programa una obligación en el calendario tributario.'}
+                {isReadOnly
+                    ? 'Detalle de la obligación programada.'
+                    : isEditMode
+                      ? 'Ajusta la fecha, el responsable o las observaciones.'
+                      : 'Programa una obligación en el calendario tributario.'}
             </p>
 
             <form onSubmit={handleSubmit}>
@@ -153,7 +167,7 @@ const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, f
 
                         <div>
                             <Label htmlFor="evento-fecha-limite">Fecha límite</Label>
-                            <DatePicker id="evento-fecha-limite" value={fechaLimite} onChange={setFechaLimite} required />
+                            <DatePicker id="evento-fecha-limite" value={fechaLimite} onChange={setFechaLimite} required disabled={isReadOnly} />
                         </div>
                     </div>
 
@@ -166,6 +180,7 @@ const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, f
                             placeholderSelectable
                             defaultValue={responsableId}
                             onChange={setResponsableId}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -175,12 +190,13 @@ const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, f
                             id="evento-observaciones"
                             rows={3}
                             maxLength={500}
+                            disabled={isReadOnly}
                             value={observaciones}
                             onChange={(event) => setObservaciones(event.target.value)}
                         />
                     </div>
 
-                    {isEditMode && (
+                    {isEditMode && canChangeStatus && (
                         <div className="border-t border-gray-100 pt-5 dark:border-gray-800">
                             <p className="mb-3 text-xs font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500">
                                 Estado actual: {ESTADO_LABELS[obligacion.estado]}
@@ -220,13 +236,31 @@ const TaxObligationEventForm: FC<TaxObligationEventFormProps> = ({ obligacion, f
                         </div>
                     )}
 
-                    <div className="flex justify-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
-                        <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting} startIcon={isSubmitting ? <Spinner size="sm" color="white" /> : undefined}>
-                            {isSubmitting ? 'Guardando…' : isEditMode ? 'Guardar cambios' : 'Crear obligación'}
-                        </Button>
+                    <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+                        <div>
+                            {isEditMode && canDelete && obligacion.estado !== 'cumplida' && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={isSubmitting}
+                                    startIcon={<Trash2 className="size-4" />}
+                                    className="w-full sm:w-auto"
+                                    onClick={() => onDelete(obligacion)}
+                                >
+                                    Eliminar
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                            <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
+                                {isReadOnly ? 'Cerrar' : 'Cancelar'}
+                            </Button>
+                            {!isReadOnly && (
+                                <Button type="submit" disabled={isSubmitting} startIcon={isSubmitting ? <Spinner size="sm" color="white" /> : undefined}>
+                                    {isSubmitting ? 'Guardando…' : isEditMode ? 'Guardar cambios' : 'Crear obligación'}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </form>

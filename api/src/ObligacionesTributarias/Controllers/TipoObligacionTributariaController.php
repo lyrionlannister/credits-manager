@@ -9,6 +9,7 @@ use App\ObligacionesTributarias\Requests\EditarTipoObligacionRequest;
 use App\ObligacionesTributarias\Services\TipoObligacionTributariaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class TipoObligacionTributariaController extends Controller
 {
@@ -33,5 +34,12 @@ class TipoObligacionTributariaController extends Controller
         $tipo = $this->tipos->editar($tipo, $peticion->validated());
 
         return response()->json(['tipo' => $tipo]);
+    }
+
+    public function destroy(TipoObligacionTributaria $tipo): Response
+    {
+        $this->tipos->eliminar($tipo);
+
+        return response()->noContent();
     }
 }
