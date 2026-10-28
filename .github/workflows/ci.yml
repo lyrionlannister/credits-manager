@@ -216,6 +216,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # ghcr.io exige el namespace en minúsculas; github.repository_owner no siempre lo está.
+      - name: Namespace de ghcr.io
+        run: echo "GHCR_NS=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # push: false siempre aquí — escanea antes de publicar, nunca al revés. Si Trivy encuentra
@@ -227,7 +231,7 @@ jobs:
           file: api/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
+          tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-api:${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -238,14 +242,14 @@ jobs:
           file: nginx/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
+          tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-nginx:${{ github.sha }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,mode=max,scope=nginx
 
       - name: Escaneo de vulnerabilidades (Trivy) — api
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
+          image-ref: ghcr.io/${{ env.GHCR_NS }}/credits-manager-api:${{ github.sha }}
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
@@ -253,7 +257,7 @@ jobs:
       - name: Escaneo de vulnerabilidades (Trivy) — nginx
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
+          image-ref: ghcr.io/${{ env.GHCR_NS }}/credits-manager-nginx:${{ github.sha }}
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
@@ -269,8 +273,8 @@ jobs:
       - name: Publicar imágenes (solo push a main)
         if: github.event_name == 'push'
         run: |
-          docker push ghcr.io/innoval-tech-sas/credits-manager-api:${{ github.sha }}
-          docker push ghcr.io/innoval-tech-sas/credits-manager-nginx:${{ github.sha }}
+          docker push ghcr.io/${{ env.GHCR_NS }}/credits-manager-api:${{ github.sha }}
+          docker push ghcr.io/${{ env.GHCR_NS }}/credits-manager-nginx:${{ github.sha }}
 
   shellcheck:
     # scripts/deploy.sh y verificar-respaldo.sh tocan producción directamente; nadie más los lintea.

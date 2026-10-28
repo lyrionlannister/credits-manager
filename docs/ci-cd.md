@@ -158,7 +158,7 @@ En `github.com/Innoval-Tech-SAS/credits-manager` → **Settings → Environments
 
 ### 2.5. GHCR: autenticación del servidor para descargar imágenes
 
-`scripts/deploy.sh` descarga las imágenes de `ghcr.io/innoval-tech-sas/credits-manager-{api,nginx}` en vez de construirlas (§1): el CI las publica ahí en cada push a `main`, autenticado con el `GITHUB_TOKEN` efímero del propio workflow. El **servidor** necesita su propia credencial, de una sola vez, para poder hacer `podman pull` de un paquete privado:
+`scripts/deploy.sh` descarga las imágenes de `ghcr.io/<owner-del-repo>/credits-manager-{api,nginx}` en vez de construirlas (§1): el CI las publica ahí en cada push a `main`, autenticado con el `GITHUB_TOKEN` efímero del propio workflow. El namespace sale del owner real del repo en ambos lados (`github.repository_owner` en CI, el remoto `origin` en el servidor) — nunca hardcodeado, porque GHCR solo permite publicar bajo el owner que ejecuta el workflow. El **servidor** necesita su propia credencial, de una sola vez, para poder hacer `podman pull` de un paquete privado:
 
 1. En GitHub: perfil → **Settings → Developer settings → Personal access tokens → Tokens (classic)** → *Generate new token*, con el único scope `read:packages`. Sin fecha de expiración corta (si expira, los despliegues empiezan a fallar en el paso 4 sin aviso previo — ponle un recordatorio de renovación en el calendario en vez de "sin expiración").
 2. Como root en el servidor:
@@ -168,7 +168,7 @@ En `github.com/Innoval-Tech-SAS/credits-manager` → **Settings → Environments
    ```
 
    Queda guardado en `/root/.config/containers/auth.json`; `podman pull` lo usa solo, sin que `deploy.sh` tenga que pasar ningún secreto.
-3. Comprueba: `podman pull ghcr.io/innoval-tech-sas/credits-manager-api:latest` (falla si aún no hay ninguna imagen publicada — normal antes del primer despliegue con este flujo).
+3. Comprueba: `podman pull ghcr.io/<owner-del-repo>/credits-manager-api:latest` (falla si aún no hay ninguna imagen publicada — normal antes del primer despliegue con este flujo).
 
 Si el login expira o se revoca, `deploy.sh` falla en el paso 4 con un mensaje que apunta aquí; repite el paso 2 con un token nuevo.
 
