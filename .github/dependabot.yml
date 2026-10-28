@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /api
+    schedule:
+      interval: weekly
+    groups:
+      laravel:
+        patterns: ["laravel/*"]
+
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: weekly
+    groups:
+      react:
+        patterns: ["react*", "@types/react*"]
+
+  - package-ecosystem: docker
+    directory: /api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /nginx
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
