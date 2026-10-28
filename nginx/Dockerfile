@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/library/node:22-alpine AS client-builder
+FROM docker.io/library/node:26-alpine AS client-builder
 WORKDIR /app
 
 ARG VITE_API_URL
