@@ -155,14 +155,17 @@ class EmpresaService
             'logo_pdf_path' => $pathPdf ? 'storage/'.$pathPdf : null,
         ]);
 
+        $nuevos = $empresa->only(['logo_path', 'logo_pdf_path']);
+        $cambiados = array_keys(array_diff_assoc($nuevos, $anteriores));
+
         $this->auditoria->registrar(
             AccionAuditoria::Modificar,
             'empresas',
             "Logo de la empresa {$empresa->nombre_empresa} actualizado",
             'empresa',
             $empresa->id,
-            anteriores: $anteriores,
-            nuevos: $empresa->only(['logo_path', 'logo_pdf_path']),
+            anteriores: array_intersect_key($anteriores, array_flip($cambiados)),
+            nuevos: array_intersect_key($nuevos, array_flip($cambiados)),
         );
 
         return $empresa;
