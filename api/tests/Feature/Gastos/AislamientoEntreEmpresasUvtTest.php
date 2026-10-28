@@ -29,7 +29,7 @@ class AislamientoEntreEmpresasUvtTest extends TestCase
 
         $respuesta->assertStatus(200);
         $this->assertCount(1, $respuesta->json('valores_uvt'));
-        $this->assertSame(2028, $respuesta->json('valores_uvt.0.anio'));
+        $this->assertSame('2028-01-01', $respuesta->json('valores_uvt.0.fecha_desde'));
     }
 
     public function test_un_admin_no_puede_editar_un_valor_uvt_de_otra_empresa(): void
@@ -58,13 +58,13 @@ class AislamientoEntreEmpresasUvtTest extends TestCase
         $this->assertDatabaseHas('valores_uvt', ['id' => $valorAjeno->id, 'borrado_en' => null]);
     }
 
-    public function test_dos_empresas_registran_su_propio_valor_para_el_mismo_anio(): void
+    public function test_dos_empresas_registran_su_propio_valor_desde_la_misma_fecha(): void
     {
         $this->actingAsAdmin();
-        $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2027, 'valor' => 47065])->assertStatus(201);
+        $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-01-01', 'valor' => 47065])->assertStatus(201);
 
         $this->actingAsAdmin();
-        $respuesta = $this->postJson('/api/v1/gastos/valores-uvt', ['anio' => 2027, 'valor' => 49799]);
+        $respuesta = $this->postJson('/api/v1/gastos/valores-uvt', ['fecha_desde' => '2027-01-01', 'valor' => 49799]);
 
         $respuesta->assertStatus(201);
         $this->assertDatabaseCount('valores_uvt', 2);

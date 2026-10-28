@@ -7,6 +7,7 @@ use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\CreatesObligacionesTributariasFixtures;
 use Tests\TestCase;
@@ -318,5 +319,80 @@ class ObligacionTributariaControllerTest extends TestCase
             'rol_id' => $rol->id,
             'activo' => true,
         ]);
+    }
+
+    public function test_sin_autenticar_no_puede_eliminar(): void
+    {
+        $this->deleteJson('/api/v1/obligaciones-tributarias/1')->assertStatus(401);
+    }
+
+    public function test_asesor_sin_permiso_no_puede_eliminar(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $obligacion = $this->crearObligacion($this->crearTipoObligacion());
+        $this->actingAsAsesor(Empresa::find($admin->empresa_id));
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")->assertStatus(403);
+    }
+
+    public function test_una_obligacion_inexistente_responde_404_al_eliminar(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->deleteJson('/api/v1/obligaciones-tributarias/999999')->assertStatus(404);
+    }
+
+    public function test_elimina_una_obligacion_pendiente_con_sus_alertas(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $obligacion = $this->crearObligacion($this->crearTipoObligacion());
+        $alertaId = DB::table('alertas_obligaciones_tributarias')->insertGetId([
+            'empresa_id' => $admin->empresa_id,
+            'obligacion_id' => $obligacion->id,
+            'fecha_limite' => '2026-10-20',
+            'dias_restantes' => 3,
+            'generada_en' => now(),
+        ]);
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")->assertStatus(204);
+
+        $this->assertSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id], null, 'borrado_en');
+        $this->assertSoftDeleted('alertas_obligaciones_tributarias', ['id' => $alertaId], null, 'borrado_en');
+    }
+
+    public function test_no_elimina_una_obligacion_cumplida(): void
+    {
+        $this->actingAsAdmin();
+        $obligacion = $this->crearObligacion($this->crearTipoObligacion(), ['estado' => 'cumplida']);
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('obligacion');
+        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacion->id], null, 'borrado_en');
+    }
+
+    public function test_una_obligacion_eliminada_se_puede_volver_a_crear_en_el_mismo_periodo(): void
+    {
+        $this->actingAsAdmin();
+        $tipo = $this->crearTipoObligacion();
+        $obligacion = $this->crearObligacion($tipo, ['periodo' => '2026-10']);
+        $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacion->id}")->assertStatus(204);
+
+        $this->postJson('/api/v1/obligaciones-tributarias', [
+            'tipo_obligacion_id' => $tipo->id,
+            'periodo' => '2026-10',
+            'fecha_limite' => '2026-10-20',
+        ])->assertStatus(201);
+    }
+
+    public function test_un_admin_no_puede_eliminar_una_obligacion_de_otra_empresa(): void
+    {
+        $this->actingAsAdmin();
+        $obligacionAjena = $this->crearObligacion($this->crearTipoObligacion());
+
+        $this->actingAsAdmin();
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/{$obligacionAjena->id}")->assertStatus(404);
+        $this->assertNotSoftDeleted('obligaciones_tributarias', ['id' => $obligacionAjena->id], null, 'borrado_en');
     }
 }

@@ -14,7 +14,7 @@ class GuardarValorUvtRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'anio' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'fecha_desde' => ['required', 'date'],
             'valor' => ['required', 'numeric', 'min:0.01'],
         ];
     }

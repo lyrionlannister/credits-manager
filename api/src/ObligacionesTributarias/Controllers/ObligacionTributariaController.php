@@ -13,6 +13,7 @@ use App\ObligacionesTributarias\Requests\ListarObligacionesRequest;
 use App\ObligacionesTributarias\Services\ObligacionTributariaService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class ObligacionTributariaController extends Controller
 {
@@ -45,6 +46,13 @@ class ObligacionTributariaController extends Controller
         $obligacion = $this->obligaciones->cambiarEstado($peticion->user(), $obligacion, $estado);
 
         return response()->json(['obligacion' => $obligacion]);
+    }
+
+    public function destroy(ObligacionTributaria $obligacion): Response
+    {
+        $this->obligaciones->eliminar($obligacion);
+
+        return response()->noContent();
     }
 
     public function responsablesAsignables(): JsonResponse

@@ -1,22 +1,25 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Settings } from 'lucide-react';
+import { Pencil, Settings, Trash2 } from 'lucide-react';
 
 import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { usePermission } from '../../auth/hooks/use-permission';
+import { ActionButton } from '@ui/action-button/components/action-button';
 import { Alert } from '@ui/alert/components/alert';
 import { Button } from '@ui/button/components/button';
 import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
 import { Label } from '@ui/forms/components/label';
 import { Select } from '@ui/forms/components/select';
+import { ConfirmModal } from '@ui/modal/components/confirm-modal';
 import { SkeletonStatus } from '@ui/skeleton/components/skeleton-status';
 import type { ApiAdvisor } from '../../clients/types/api-advisor';
 import { GoalAdvisorsTable } from '../components/goal-advisors-table';
 import { GoalAlertsList } from '../components/goal-alerts-list';
 import { GoalClosingsTable } from '../components/goal-closings-table';
 import { GoalCreateForm } from '../components/goal-create-form';
+import { EditGoalModal } from '../components/edit-goal-modal';
 import { GoalDistributionForm } from '../components/goal-distribution-form';
 import { GoalProgressCard } from '../components/goal-progress-card';
 import { GoalProgressCardSkeleton } from '../components/goal-progress-card-skeleton';
@@ -24,21 +27,24 @@ import { GoalRecalcForm } from '../components/goal-recalc-form';
 import { GOAL_TYPE_LABELS } from '../constants/goal-status';
 import type { ApiGoalAlert } from '../types/api-goal-alert';
 import type { ApiGoalClosing } from '../types/api-goal-closing';
-import type { ApiGoalType, ApiGoalsPeriod } from '../types/api-goals-period';
+import type { ApiGoal, ApiGoalType, ApiGoalsPeriod } from '../types/api-goals-period';
 import { opcionesDePeriodo, periodoActual } from '../utils/periodo-meta';
 
 const TIPOS: ApiGoalType[] = ['colocacion', 'recaudo'];
 
 export const GoalsPage: FC = () => {
     const navigate = useNavigate();
-    const { sendRequest } = useSendRequest();
+    const { sendRequest, isLoading: isDeleting } = useSendRequest();
 
     const [periodo, setPeriodo] = useState(periodoActual());
     const [markingId, setMarkingId] = useState<number | null>(null);
     const [mensaje, setMensaje] = useState<string | null>(null);
+    const [metaEnEdicion, setMetaEnEdicion] = useState<ApiGoal | null>(null);
+    const [metaPorEliminar, setMetaPorEliminar] = useState<ApiGoal | null>(null);
 
     const puedeConfigurar = usePermission('metas', 'configurar');
     const puedeRecalcular = usePermission('metas', 'recalcular');
+    const puedeEliminar = usePermission('metas', 'eliminar');
 
     const { data: resumen, error, refetch } = useResource<ApiGoalsPeriod>(`/metas?periodo=${periodo}`);
     const { data: alertas, refetch: recargarAlertas } = useResource<{ alertas: ApiGoalAlert[] }>('/metas/alertas');
@@ -69,6 +75,21 @@ export const GoalsPage: FC = () => {
             setMensaje(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
         } finally {
             setMarkingId(null);
+        }
+    };
+
+    const confirmarEliminar = async () => {
+        if (metaPorEliminar === null) {
+            return;
+        }
+
+        try {
+            await sendRequest(`/metas/${metaPorEliminar.id}`, { method: 'DELETE' });
+            recargarTodo();
+        } catch (caught) {
+            setMensaje(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
+        } finally {
+            setMetaPorEliminar(null);
         }
     };
 
@@ -131,7 +152,19 @@ export const GoalsPage: FC = () => {
 
                     {resumen.metas.map((meta) => (
                         <section key={meta.id} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 md:p-6">
-                            <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Asesores · {GOAL_TYPE_LABELS[meta.tipo]}</h2>
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Asesores · {GOAL_TYPE_LABELS[meta.tipo]}</h2>
+                                {!meta.cerrado && (puedeConfigurar || puedeEliminar) && (
+                                    <div className="flex shrink-0 items-center gap-3">
+                                        {puedeConfigurar && (
+                                            <ActionButton icon={<Pencil className="size-5" />} label="Editar meta" onClick={() => setMetaEnEdicion(meta)} />
+                                        )}
+                                        {puedeEliminar && (
+                                            <ActionButton icon={<Trash2 className="size-5" />} label="Eliminar meta" variant="danger" onClick={() => setMetaPorEliminar(meta)} />
+                                        )}
+                                    </div>
+                                )}
+                            </div>
 
                             {resumen.ver_detalle ? (
                                 <div className="space-y-6">
@@ -186,6 +219,29 @@ export const GoalsPage: FC = () => {
                     )}
                 </div>
             )}
+
+            {metaEnEdicion && (
+                <EditGoalModal
+                    meta={metaEnEdicion}
+                    periodo={periodo}
+                    onClose={() => setMetaEnEdicion(null)}
+                    onSaved={() => {
+                        setMetaEnEdicion(null);
+                        recargarTodo();
+                    }}
+                />
+            )}
+
+            <ConfirmModal
+                isOpen={metaPorEliminar !== null}
+                onClose={() => setMetaPorEliminar(null)}
+                onConfirm={() => void confirmarEliminar()}
+                variant="danger"
+                title="Eliminar meta"
+                description={`La meta de ${metaPorEliminar ? GOAL_TYPE_LABELS[metaPorEliminar.tipo].toLowerCase() : ''} del período ${periodo} se eliminará junto con su distribución por asesor.`}
+                confirmLabel="Eliminar"
+                isConfirming={isDeleting}
+            />
         </div>
     );
 };

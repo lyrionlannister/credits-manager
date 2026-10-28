@@ -183,6 +183,7 @@ return [
             'periodo_no_cerrado' => 'El período no está cerrado; solo se recalcula un período cerrado.',
             'distribucion_supera' => 'La distribución suma :suma y supera la meta de :meta.',
             'distribucion_incompleta' => 'La distribución debe sumar exactamente la meta de :meta.',
+            'tiene_cierres' => 'La meta ya tiene cierres registrados; no se puede eliminar.',
         ],
         'tareas_programadas' => [
             'no_pausable' => 'El respaldo automático no se puede pausar; solo se puede cambiar su hora.',
@@ -193,6 +194,8 @@ return [
         'obligaciones_tributarias' => [
             'nombre_repetido' => 'Ya existe un tipo de obligación tributaria con este nombre.',
             'periodo_repetido' => 'Ya existe esta obligación tributaria para el período.',
+            'cumplida_no_eliminable' => 'Una obligación cumplida no se puede eliminar.',
+            'tipo_con_obligaciones' => 'Este tipo tiene obligaciones registradas; desactívalo en lugar de eliminarlo.',
         ],
         'correo' => [
             'sin_configurar' => 'La empresa no tiene configurado el servidor de correo.',
@@ -365,8 +368,9 @@ return [
             'solapa_rango_cerrado' => 'Ya existe una tarifa de ReteICA vigente para ese municipio y actividad económica en esa fecha.',
         ],
         'valor_uvt' => [
-            'no_configurado' => 'No hay un valor de UVT configurado para el año de la fecha del documento.',
-            'tiene_gastos_asociados' => 'No se puede modificar ni eliminar: ya hay gastos causados con fecha de ese año.',
+            'no_configurado' => 'No hay un valor de UVT vigente para la fecha del documento.',
+            'tiene_gastos_asociados' => 'No se puede modificar ni eliminar: ya hay gastos causados en su rango de vigencia. Crea un valor UVT nuevo para cerrar esta vigencia y seguir desde ahí.',
+            'solapa_rango_cerrado' => 'Ya existe un valor UVT vigente en esa fecha.',
         ],
         'plan_cuenta' => [
             'padre_es_la_misma_cuenta' => 'Una cuenta no puede ser su propia cuenta padre.',

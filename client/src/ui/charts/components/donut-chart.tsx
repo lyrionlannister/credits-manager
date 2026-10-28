@@ -25,7 +25,7 @@ export const DonutChart: FC<DonutChartProps> = ({
             active: { filter: { type: 'none' } },
         },
         tooltip: {
-            y: { formatter: (value) => valueFormatter(value) },
+            y: { formatter: (value) => valueFormatter(value ?? 0) },
         },
         legend: {
             show: showLegend,

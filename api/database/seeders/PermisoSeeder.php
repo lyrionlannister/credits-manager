@@ -70,8 +70,8 @@ class PermisoSeeder extends Seeder
             'importar_plan_cuentas', 'importar_terceros', 'importar_gastos', 'importar_actividades_economicas',
             'importar_valores_uvt', 'importar_tarifas_reteica',
         ],
-        'metas' => ['listar', 'configurar', 'recalcular'],
-        'obligaciones_tributarias' => ['listar', 'configurar', 'crear', 'editar', 'cambiar_estado'],
+        'metas' => ['listar', 'configurar', 'recalcular', 'eliminar'],
+        'obligaciones_tributarias' => ['listar', 'configurar', 'crear', 'editar', 'cambiar_estado', 'eliminar', 'eliminar_tipos'],
     ];
 
     public function run(): void

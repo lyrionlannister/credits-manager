@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/library/node:22-alpine AS client-builder
+FROM docker.io/library/node:26-alpine AS client-builder
 WORKDIR /app
 
 ARG VITE_API_URL
@@ -14,7 +14,8 @@ ENV VITE_REVERB_APP_KEY=$VITE_REVERB_APP_KEY \
     VITE_REVERB_PORT=$VITE_REVERB_PORT \
     VITE_REVERB_SCHEME=$VITE_REVERB_SCHEME
 
-RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
+# Node 26 ya no trae corepack preinstalado.
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.13.0 --activate
 
 COPY client/package.json client/pnpm-lock.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \

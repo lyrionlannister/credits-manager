@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ObligacionesTributarias;
 
+use App\Empresas\Models\Empresa;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\CreatesObligacionesTributariasFixtures;
@@ -139,5 +140,64 @@ class TipoObligacionTributariaControllerTest extends TestCase
         $respuesta = $this->getJson('/api/v1/obligaciones-tributarias/tipos');
 
         $respuesta->assertStatus(200)->assertJsonCount(1, 'data');
+    }
+
+    public function test_sin_autenticar_no_puede_eliminar_un_tipo(): void
+    {
+        $this->deleteJson('/api/v1/obligaciones-tributarias/tipos/1')->assertStatus(401);
+    }
+
+    public function test_asesor_sin_permiso_no_puede_eliminar_un_tipo(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $tipo = $this->crearTipoObligacion();
+        $this->actingAsAsesor(Empresa::find($admin->empresa_id));
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/tipos/{$tipo->id}")->assertStatus(403);
+    }
+
+    public function test_un_tipo_inexistente_responde_404_al_eliminar(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->deleteJson('/api/v1/obligaciones-tributarias/tipos/999999')->assertStatus(404);
+    }
+
+    public function test_elimina_un_tipo_sin_obligaciones_y_permite_reusar_el_nombre(): void
+    {
+        $this->actingAsAdmin();
+        $tipo = $this->crearTipoObligacion(['nombre' => 'ICA anual']);
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/tipos/{$tipo->id}")->assertStatus(204);
+        $this->assertSoftDeleted('tipos_obligacion_tributaria', ['id' => $tipo->id], null, 'borrado_en');
+
+        $this->postJson('/api/v1/obligaciones-tributarias/tipos', [
+            'nombre' => 'ICA anual',
+            'periodicidad' => 'anual',
+            'dias_alerta_previa' => 5,
+        ])->assertStatus(201);
+    }
+
+    public function test_no_elimina_un_tipo_con_obligaciones(): void
+    {
+        $this->actingAsAdmin();
+        $tipo = $this->crearTipoObligacion();
+        $this->crearObligacion($tipo);
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/tipos/{$tipo->id}")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tipo');
+        $this->assertNotSoftDeleted('tipos_obligacion_tributaria', ['id' => $tipo->id], null, 'borrado_en');
+    }
+
+    public function test_un_admin_no_puede_eliminar_un_tipo_de_otra_empresa(): void
+    {
+        $this->actingAsAdmin();
+        $tipoAjeno = $this->crearTipoObligacion();
+
+        $this->actingAsAdmin();
+
+        $this->deleteJson("/api/v1/obligaciones-tributarias/tipos/{$tipoAjeno->id}")->assertStatus(404);
+        $this->assertNotSoftDeleted('tipos_obligacion_tributaria', ['id' => $tipoAjeno->id], null, 'borrado_en');
     }
 }

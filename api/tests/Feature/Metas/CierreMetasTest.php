@@ -160,4 +160,12 @@ class CierreMetasTest extends TestCase
 
         $this->assertTrue(DB::table('alertas_metas')->where('estado', 'incumplida')->whereNull('usuario_id')->exists());
     }
+
+    public function test_una_meta_con_cierres_no_se_puede_eliminar(): void
+    {
+        [, , , $colocacion] = $this->septiembreCerrado();
+
+        $this->deleteJson("/api/v1/metas/{$colocacion->id}")->assertUnprocessable()->assertJsonValidationErrors(['meta']);
+        $this->assertNotSoftDeleted('metas', ['id' => $colocacion->id], null, 'borrado_en');
+    }
 }
