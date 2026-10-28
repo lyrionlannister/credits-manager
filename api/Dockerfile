@@ -17,7 +17,7 @@ WORKDIR /var/www/html
 # opcache ya no se instala: PHP 8.5 lo compila estático en el binario (zend_extension innecesario,
 # docker-php-ext-install opcache falla porque configure ya no expone --enable-opcache).
 RUN apk upgrade --no-cache \
-    && apk add --no-cache icu-dev libzip-dev oniguruma-dev libpng-dev libjpeg-turbo-dev mysql-client mariadb-connector-c \
+    && apk add --no-cache icu-dev libzip-dev oniguruma-dev libpng-dev libjpeg-turbo-dev mysql-client mariadb-connector-c rsvg-convert \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install pdo_mysql mbstring bcmath intl zip pcntl posix gd \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \

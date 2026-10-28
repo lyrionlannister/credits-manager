@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Auditoria\Commands\EscucharAuditoriaCommand;
 use App\Auditoria\Commands\EstadoAuditoriaCommand;
 use App\Contabilidad\Commands\DevengarInteresesCommand;
+use App\Empresas\Commands\RasterizarLogosPendientesCommand;
 use App\Exportacion\Commands\LimpiarExportacionesCommand;
 use App\Importacion\Commands\LimpiarImportacionesCommand;
 use App\Metas\Commands\EvaluarMetasCommand;
@@ -49,7 +50,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->commands([EscucharAuditoriaCommand::class, EstadoAuditoriaCommand::class, LimpiarExportacionesCommand::class, LimpiarImportacionesCommand::class, EvaluarMetasCommand::class, EjecutarRespaldoCommand::class, EvaluarAlertasObligacionesCommand::class, PublicarMonitoreoCommand::class, DevengarInteresesCommand::class]);
+        $this->commands([EscucharAuditoriaCommand::class, EstadoAuditoriaCommand::class, LimpiarExportacionesCommand::class, LimpiarImportacionesCommand::class, EvaluarMetasCommand::class, EjecutarRespaldoCommand::class, EvaluarAlertasObligacionesCommand::class, PublicarMonitoreoCommand::class, DevengarInteresesCommand::class, RasterizarLogosPendientesCommand::class]);
 
         Event::listen(Looping::class, [LatidoTrabajadores::class, 'enEspera']);
         Event::listen(JobProcessing::class, [LatidoTrabajadores::class, 'alEmpezar']);

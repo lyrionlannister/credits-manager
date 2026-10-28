@@ -30,7 +30,7 @@ Un documento real se arma en el Service de su módulo (ver `Creditos/Documentos/
 ## Reglas
 
 - **Cifras y fechas** las formatea `FormateadorDocumento` como la plantilla de DDA: coma de miles y punto decimal. Los montos viajan como `Dinero`. Una fecha **con hora** es un instante y se lleva a hora de Bogotá; una fecha **sin hora** (vencimiento, desembolso) es de calendario y se imprime tal cual, sin correrla de día.
-- **Logo**: solo PNG, JPG o GIF. El SVG se omite porque dompdf lo dibuja con fondo negro. Requiere la extensión `gd` (en el `Dockerfile` de `api`).
+- **Logo**: el PDF solo dibuja PNG, JPG o GIF (`LogoEmpresa::TIPOS_ADMITIDOS`); dompdf pinta el SVG con fondo negro. Si la empresa sube un SVG (se ve mejor en la web, por eso `logo_path` lo conserva), `EmpresaService::actualizarLogoPropia` lo rasteriza con `rsvg-convert` (paquete `rsvg-convert` del `Dockerfile`) y guarda el PNG resultante en `logo_pdf_path`; `LogoEmpresa::comoDataUri` prefiere esa columna y solo cae a `logo_path` cuando no existe. Si `rsvg-convert` falla, `logo_pdf_path` queda `null` y el PDF sale sin logo, sin romperse.
 - **Horizontal** (`OrientacionDocumento::Horizontal`): la fuente de la tabla baja a 7 pt y las celdas aceptan saltos de línea (`
 `), lo que permite valor y estado en dos líneas para caber muchos meses. Los anchos de columna (`ancho`, en %) se aplican a las celdas de la primera fila.
 - Varias páginas: la cabecera de la tabla se repite, los totales van una sola vez al final y cada página lleva "Página x de y".

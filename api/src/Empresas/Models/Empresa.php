@@ -8,7 +8,7 @@ use App\Geografia\Models\Municipio;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['nombre_empresa', 'nit', 'digito_verificacion', 'direccion', 'municipio_id', 'actividad_economica_id', 'responsable_iva', 'autorretenedor', 'telefono', 'correo', 'logo_path'])]
+#[Fillable(['nombre_empresa', 'nit', 'digito_verificacion', 'direccion', 'municipio_id', 'actividad_economica_id', 'responsable_iva', 'autorretenedor', 'telefono', 'correo', 'logo_path', 'logo_pdf_path'])]
 class Empresa extends BaseModel
 {
     protected $table = 'empresas';

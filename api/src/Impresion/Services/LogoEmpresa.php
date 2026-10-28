@@ -3,6 +3,7 @@
 namespace App\Impresion\Services;
 
 use App\Empresas\Models\Empresa;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -14,11 +15,14 @@ final class LogoEmpresa
 
     public function comoDataUri(Empresa $empresa): ?string
     {
-        if (! $empresa->logo_path) {
+        $ruta = $empresa->logo_pdf_path ?: $empresa->logo_path;
+
+        if (! $ruta) {
             return null;
         }
 
-        $ruta = Str::after($empresa->logo_path, 'storage/');
+        $ruta = Str::after($ruta, 'storage/');
+        /** @var FilesystemAdapter $disco */
         $disco = Storage::disk('public');
 
         if (! $disco->exists($ruta)) {
