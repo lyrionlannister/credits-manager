@@ -32,7 +32,7 @@ class ObligacionTributariaService
     public function listar(Usuario $usuario, array $filtros, CarbonImmutable $hoy): array
     {
         if ($mes = $filtros['mes'] ?? null) {
-            $inicioMes = CarbonImmutable::createFromFormat('Y-m', $mes)->startOfMonth();
+            $inicioMes = CarbonImmutable::createFromFormat('Y-m-d', $mes.'-01')->startOfMonth();
             $filtros['fecha_desde'] = $inicioMes->toDateString();
             $filtros['fecha_hasta'] = $inicioMes->endOfMonth()->toDateString();
         }

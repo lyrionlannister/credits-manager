@@ -56,8 +56,8 @@ class ReporteGastosCentroCostoService
     public function rango(string $desdeMes, string $hastaMes): array
     {
         return [
-            Carbon::createFromFormat('Y-m', $desdeMes)->startOfMonth()->toDateString(),
-            Carbon::createFromFormat('Y-m', $hastaMes)->endOfMonth()->toDateString(),
+            Carbon::createFromFormat('Y-m-d', $desdeMes.'-01')->startOfMonth()->toDateString(),
+            Carbon::createFromFormat('Y-m-d', $hastaMes.'-01')->endOfMonth()->toDateString(),
         ];
     }
 }
