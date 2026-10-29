@@ -28,10 +28,13 @@ final class GeneradorPdf
             $filas[] = $fila;
         }
 
+        $campos = $documento->camposEmpresa();
+
         $html = view('impresion.documento', [
             'empresa' => $empresa,
-            'ubicacion' => $this->ubicacion($empresa),
-            'logo' => $this->logos->comoDataUri($empresa),
+            'campos' => $campos,
+            'ubicacion' => $campos->ubicacion ? $this->ubicacion($empresa) : null,
+            'logo' => $campos->logo ? $this->logos->comoDataUri($empresa) : null,
             'documento' => $documento,
             'columnas' => $documento->columnas(),
             'filas' => $filas,

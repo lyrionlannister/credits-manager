@@ -3,6 +3,7 @@
 namespace App\Contabilidad\Documentos;
 
 use App\Impresion\Contracts\DocumentoPdf;
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -106,5 +107,10 @@ final class InformeContablePdf implements DocumentoPdf
     public function marcaAgua(): ?string
     {
         return null;
+    }
+
+    public function camposEmpresa(): CamposEmpresaDocumento
+    {
+        return CamposEmpresaDocumento::todos();
     }
 }

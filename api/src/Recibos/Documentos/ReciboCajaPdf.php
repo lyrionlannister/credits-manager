@@ -5,6 +5,7 @@ namespace App\Recibos\Documentos;
 use App\Core\Dinero\Dinero;
 use App\Facturacion\Models\CobroFacturacion;
 use App\Impresion\Contracts\DocumentoPdf;
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -171,6 +172,11 @@ final class ReciboCajaPdf implements DocumentoPdf
     public function marcaAgua(): ?string
     {
         return $this->anulado() ? 'ANULADO' : null;
+    }
+
+    public function camposEmpresa(): CamposEmpresaDocumento
+    {
+        return CamposEmpresaDocumento::todos();
     }
 
     private function esPago(): bool

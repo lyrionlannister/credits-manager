@@ -90,12 +90,12 @@
                 @endif
             </td>
             <td style="width: 40%;" class="empresa">
-                <div class="nombre">{{ $empresa->nombre_empresa }}</div>
-                @if ($empresa->nit)<div>NIT {{ $empresa->nit }}</div>@endif
-                @if ($empresa->direccion)<div>{{ $empresa->direccion }}</div>@endif
-                @if ($empresa->telefono)<div>Tel: {{ $empresa->telefono }}</div>@endif
-                @if ($ubicacion)<div>{{ $ubicacion }}</div>@endif
-                @if ($empresa->correo)<div>{{ $empresa->correo }}</div>@endif
+                @if ($campos->nombre)<div class="nombre">{{ $empresa->nombre_empresa }}</div>@endif
+                @if ($campos->nit && $empresa->nitConDigito())<div>NIT {{ $empresa->nitConDigito() }}</div>@endif
+                @if ($campos->direccion && $empresa->direccion)<div>{{ $empresa->direccion }}</div>@endif
+                @if ($campos->telefono && $empresa->telefono)<div>Tel: {{ $empresa->telefono }}</div>@endif
+                @if ($campos->ubicacion && $ubicacion)<div>{{ $ubicacion }}</div>@endif
+                @if ($campos->correo && $empresa->correo)<div>{{ $empresa->correo }}</div>@endif
             </td>
             <td style="width: 30%; padding-left: 14pt;">
                 <div class="caja-documento">
