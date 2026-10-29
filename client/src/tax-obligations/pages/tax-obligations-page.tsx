@@ -1,9 +1,9 @@
-import esLocale from '@fullcalendar/react/locales/es';
-import dayGridPlugin from '@fullcalendar/react/daygrid';
-import interactionPlugin from '@fullcalendar/react/interaction';
+import type { DatesSetArg, EventClickArg, EventContentArg } from '@fullcalendar/core';
+import esLocale from '@fullcalendar/core/locales/es';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin, { type DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/react/timegrid';
-import type { DateClickInfo, DatesSetInfo, EventClickInfo, EventDisplayInfo } from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import type { FC } from 'react';
 import { useState } from 'react';
 
@@ -59,7 +59,7 @@ export const TaxObligationsPage: FC = () => {
         setObligacionesVisibles(respuesta.data);
     }
 
-    const handleDatesSet = (info: DatesSetInfo) => {
+    const handleDatesSet = (info: DatesSetArg) => {
         const inicio = info.view.currentStart;
         const nuevoMes = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}`;
         setMes((actual) => (actual === nuevoMes ? actual : nuevoMes));
@@ -71,13 +71,13 @@ export const TaxObligationsPage: FC = () => {
         setModalEventoAbierto(true);
     };
 
-    const handleDateClick = (info: DateClickInfo) => {
+    const handleDateClick = (info: DateClickArg) => {
         if (puedeCrear) {
             abrirNuevaObligacion(info.dateStr);
         }
     };
 
-    const handleEventClick = (info: EventClickInfo) => {
+    const handleEventClick = (info: EventClickArg) => {
         const { obligacion } = info.event.extendedProps as TaxObligationEventProps;
         setObligacionEnEdicion(obligacion);
         setFechaNuevaObligacion(null);
@@ -111,7 +111,7 @@ export const TaxObligationsPage: FC = () => {
         }
     };
 
-    const renderEventContent = (eventInfo: EventDisplayInfo) => {
+    const renderEventContent = (eventInfo: EventContentArg) => {
         const { color } = eventInfo.event.extendedProps as { color: ApiTaxObligationColor };
 
         return (

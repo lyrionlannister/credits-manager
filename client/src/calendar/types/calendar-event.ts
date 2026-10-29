@@ -1,4 +1,4 @@
-import type { EventInput } from '@fullcalendar/react';
+import type { EventInput } from '@fullcalendar/core';
 import type { InstallmentStatus } from '../../credits/types/installment-status';
 import type { CalendarInstallmentColor } from './api-calendar-installment';
 
