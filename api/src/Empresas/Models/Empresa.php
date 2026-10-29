@@ -32,4 +32,16 @@ class Empresa extends BaseModel
     {
         return $this->belongsTo(ActividadEconomica::class);
     }
+
+    /** NIT tal como se imprime, con su dígito de verificación. */
+    public function nitConDigito(): ?string
+    {
+        if (! $this->nit) {
+            return null;
+        }
+
+        return $this->digito_verificacion !== null
+            ? "{$this->nit}-{$this->digito_verificacion}"
+            : $this->nit;
+    }
 }

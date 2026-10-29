@@ -2,6 +2,7 @@
 
 namespace App\Impresion\Contracts;
 
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -66,4 +67,7 @@ interface DocumentoPdf
 
     /** Texto de la marca de agua diagonal sobre todo el documento (p. ej. "ANULADO"); nulo si no aplica. */
     public function marcaAgua(): ?string;
+
+    /** Qué datos de la empresa van en el encabezado; `CamposEmpresaDocumento::todos()` para el comportamiento por defecto. */
+    public function camposEmpresa(): CamposEmpresaDocumento;
 }

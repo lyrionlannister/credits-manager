@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Core\Dinero\Dinero;
 use App\Impresion\Contracts\DocumentoPdf;
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -118,5 +119,10 @@ final class DocumentoPdfDePrueba implements DocumentoPdf
     public function marcaAgua(): ?string
     {
         return $this->marcaAgua;
+    }
+
+    public function camposEmpresa(): CamposEmpresaDocumento
+    {
+        return CamposEmpresaDocumento::todos();
     }
 }

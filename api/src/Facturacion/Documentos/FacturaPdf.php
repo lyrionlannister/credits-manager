@@ -6,6 +6,7 @@ use App\Core\Dinero\Dinero;
 use App\Facturacion\Enums\TipoDocumentoFacturacion;
 use App\Facturacion\Models\DocumentoFacturacion;
 use App\Impresion\Contracts\DocumentoPdf;
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -167,5 +168,10 @@ final class FacturaPdf implements DocumentoPdf
     public function marcaAgua(): ?string
     {
         return null;
+    }
+
+    public function camposEmpresa(): CamposEmpresaDocumento
+    {
+        return CamposEmpresaDocumento::todos();
     }
 }

@@ -6,6 +6,7 @@ use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCuota;
 use App\Creditos\Models\Credito;
 use App\Impresion\Contracts\DocumentoPdf;
+use App\Impresion\Data\CamposEmpresaDocumento;
 use App\Impresion\Data\ColumnaDocumento;
 use App\Impresion\Data\DestinatarioDocumento;
 use App\Impresion\Data\FechaDocumento;
@@ -179,6 +180,11 @@ final class EstadoCuentaPdf implements DocumentoPdf
     public function marcaAgua(): ?string
     {
         return null;
+    }
+
+    public function camposEmpresa(): CamposEmpresaDocumento
+    {
+        return new CamposEmpresaDocumento(direccion: false, telefono: false, ubicacion: false, correo: false);
     }
 
     /** Los pagos reversados siguen en el detalle para trazabilidad, pero no suman al total recaudado. */
