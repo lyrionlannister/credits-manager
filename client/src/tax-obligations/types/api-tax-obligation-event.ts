@@ -1,4 +1,4 @@
-import type { EventInput } from '@fullcalendar/react';
+import type { EventInput } from '@fullcalendar/core';
 
 import type { ApiTaxObligation, ApiTaxObligationColor } from './api-tax-obligation';
 

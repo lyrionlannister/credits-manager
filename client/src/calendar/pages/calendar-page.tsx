@@ -1,9 +1,9 @@
-import esLocale from '@fullcalendar/react/locales/es';
-import dayGridPlugin from '@fullcalendar/react/daygrid';
-import interactionPlugin from '@fullcalendar/react/interaction';
+import type { DatesSetArg, EventClickArg, EventContentArg } from '@fullcalendar/core';
+import esLocale from '@fullcalendar/core/locales/es';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/react/timegrid';
-import type { DatesSetInfo, EventClickInfo, EventDisplayInfo } from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import type { FC } from 'react';
 import { useState } from 'react';
 
@@ -42,17 +42,17 @@ export const CalendarPage: FC = () => {
         setAgendaVisible(agenda);
     }
 
-    const handleDatesSet = (info: DatesSetInfo) => {
+    const handleDatesSet = (info: DatesSetArg) => {
         const inicio = info.view.currentStart;
         const nuevoMes = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}`;
         setMes((actual) => (actual === nuevoMes ? actual : nuevoMes));
     };
 
-    const handleEventClick = (info: EventClickInfo) => {
+    const handleEventClick = (info: EventClickArg) => {
         setDetalle(info.event.extendedProps as CalendarEventProps);
     };
 
-    const renderEventContent = (eventInfo: EventDisplayInfo) => {
+    const renderEventContent = (eventInfo: EventContentArg) => {
         const { color } = eventInfo.event.extendedProps as { color: CalendarInstallmentColor };
 
         return (
