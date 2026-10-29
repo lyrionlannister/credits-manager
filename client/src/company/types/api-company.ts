@@ -13,5 +13,6 @@ export type ApiCompany = {
     telefono: string | null;
     correo: string | null;
     logo_path: string | null;
+    logo_dark_path: string | null;
     creado_en: string | null;
 };

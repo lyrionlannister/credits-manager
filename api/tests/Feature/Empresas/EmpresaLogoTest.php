@@ -18,7 +18,7 @@ class EmpresaLogoTest extends TestCase
         Storage::fake('public');
         $this->actingAsAdmin();
 
-        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png')])
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png'), 'variante' => 'claro'])
             ->assertOk()
             ->assertJsonPath('empresa.logo_pdf_path', null);
     }
@@ -33,7 +33,7 @@ class EmpresaLogoTest extends TestCase
             '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
         );
 
-        $empresa = $this->postJson('/api/v1/empresa/logo', ['logo' => $svg])->assertOk()->json('empresa');
+        $empresa = $this->postJson('/api/v1/empresa/logo', ['logo' => $svg, 'variante' => 'claro'])->assertOk()->json('empresa');
 
         $this->assertStringEndsWith('.svg', $empresa['logo_path']);
         $this->assertNotNull($empresa['logo_pdf_path']);
@@ -41,18 +41,46 @@ class EmpresaLogoTest extends TestCase
         Storage::disk('public')->assertExists(str_replace('storage/', '', $empresa['logo_pdf_path']));
     }
 
+    public function test_subir_un_logo_oscuro_no_genera_version_para_pdf_ni_toca_el_logo_claro(): void
+    {
+        Storage::fake('public');
+        $this->actingAsAdmin();
+
+        $claro = $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('claro.png'), 'variante' => 'claro'])
+            ->assertOk()
+            ->json('empresa');
+
+        $empresa = $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('oscuro.png'), 'variante' => 'oscuro'])
+            ->assertOk()
+            ->json('empresa');
+
+        $this->assertSame($claro['logo_path'], $empresa['logo_path']);
+        $this->assertNotNull($empresa['logo_dark_path']);
+        $this->assertNotSame($empresa['logo_path'], $empresa['logo_dark_path']);
+        $this->assertNull($empresa['logo_pdf_path']);
+    }
+
     public function test_subir_un_webp_se_rechaza(): void
     {
         $this->actingAsAdmin();
 
-        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->create('logo.webp', 10, 'image/webp')])
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->create('logo.webp', 10, 'image/webp'), 'variante' => 'claro'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('logo');
     }
 
+    public function test_falta_la_variante_se_rechaza(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png')])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('variante');
+    }
+
     public function test_sin_sesion_no_hay_respuesta(): void
     {
-        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png')])->assertUnauthorized();
+        $this->postJson('/api/v1/empresa/logo', ['logo' => UploadedFile::fake()->image('logo.png'), 'variante' => 'claro'])->assertUnauthorized();
     }
 
     public function test_el_comando_de_backfill_rasteriza_los_logos_svg_subidos_antes_del_fix(): void

@@ -37,20 +37,26 @@ export const EditCompanyForm: FC = () => {
 
     const [logoError, setLogoError] = useState<string | null>(null);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [logoDarkError, setLogoDarkError] = useState<string | null>(null);
+    const [isUploadingLogoDark, setIsUploadingLogoDark] = useState(false);
 
-    const handleLogoDrop = async (file: File) => {
-        setLogoError(null);
-        setIsUploadingLogo(true);
+    const handleLogoDrop = async (variante: 'claro' | 'oscuro', file: File) => {
+        const setError = variante === 'claro' ? setLogoError : setLogoDarkError;
+        const setIsUploading = variante === 'claro' ? setIsUploadingLogo : setIsUploadingLogoDark;
+
+        setError(null);
+        setIsUploading(true);
 
         try {
             const formData = new FormData();
             formData.append('logo', file);
+            formData.append('variante', variante);
             await sendRequest('/empresa/logo', { method: 'POST', body: formData });
             await refresh();
         } catch (caught) {
-            setLogoError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
+            setError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
         } finally {
-            setIsUploadingLogo(false);
+            setIsUploading(false);
         }
     };
 
@@ -228,38 +234,69 @@ export const EditCompanyForm: FC = () => {
                     </section>
 
                     <section className="border-t border-gray-100 pt-8 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-12 dark:border-gray-800">
-                        <Label htmlFor="logo-empresa">Logo</Label>
+                        <div className="space-y-6">
+                            <div>
+                                <Label htmlFor="logo-empresa">Logo (modo claro)</Label>
 
-                        {logoError && (
-                            <div className="mb-3 rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
-                                {logoError}
-                            </div>
-                        )}
+                                {logoError && (
+                                    <div className="mb-3 rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
+                                        {logoError}
+                                    </div>
+                                )}
 
-                        {company?.logoPath && (
-                            <div className="mb-3 flex items-center gap-3">
-                                <img
-                                    src={`${API_ROOT}/${company.logoPath}`}
-                                    alt={company.name}
-                                    className="max-h-14 max-w-40 rounded-lg border border-gray-200 p-1 dark:border-gray-800"
-                                />
-                                <span className="text-sm text-gray-500 dark:text-gray-400">Logo actual</span>
-                            </div>
-                        )}
+                                {company?.logoPath && (
+                                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800">
+                                        <img src={`${API_ROOT}/${company.logoPath}`} alt={company.name} className="max-h-14 max-w-40" />
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Logo actual</span>
+                                    </div>
+                                )}
 
-                        {isUploadingLogo ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                <Spinner size="sm" />
-                                Subiendo logo…
+                                {isUploadingLogo ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                        <Spinner size="sm" />
+                                        Subiendo logo…
+                                    </div>
+                                ) : (
+                                    <Dropzone
+                                        id="logo-empresa"
+                                        onFileAccepted={(file) => handleLogoDrop('claro', file)}
+                                        accept={{ 'image/png': [], 'image/jpeg': [], 'image/gif': [], 'image/svg+xml': [] }}
+                                        hint="PNG, JPG, GIF o SVG — máx. 2MB. También se usa en los PDF."
+                                    />
+                                )}
                             </div>
-                        ) : (
-                            <Dropzone
-                                id="logo-empresa"
-                                onFileAccepted={handleLogoDrop}
-                                accept={{ 'image/png': [], 'image/jpeg': [], 'image/gif': [], 'image/svg+xml': [] }}
-                                hint="PNG, JPG, GIF o SVG — máx. 2MB"
-                            />
-                        )}
+
+                            <div>
+                                <Label htmlFor="logo-empresa-oscuro">Logo (modo oscuro)</Label>
+
+                                {logoDarkError && (
+                                    <div className="mb-3 rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
+                                        {logoDarkError}
+                                    </div>
+                                )}
+
+                                {company?.logoDarkPath && (
+                                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-900 p-2 dark:border-gray-800">
+                                        <img src={`${API_ROOT}/${company.logoDarkPath}`} alt={company.name} className="max-h-14 max-w-40" />
+                                        <span className="text-sm text-gray-300 dark:text-gray-300">Logo actual</span>
+                                    </div>
+                                )}
+
+                                {isUploadingLogoDark ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                        <Spinner size="sm" />
+                                        Subiendo logo…
+                                    </div>
+                                ) : (
+                                    <Dropzone
+                                        id="logo-empresa-oscuro"
+                                        onFileAccepted={(file) => handleLogoDrop('oscuro', file)}
+                                        accept={{ 'image/png': [], 'image/jpeg': [], 'image/gif': [], 'image/svg+xml': [] }}
+                                        hint="PNG, JPG, GIF o SVG — máx. 2MB. Opcional: si no lo subes, se usa el logo claro."
+                                    />
+                                )}
+                            </div>
+                        </div>
                     </section>
                 </div>
 

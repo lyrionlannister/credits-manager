@@ -9,4 +9,5 @@ export type Company = {
     phone: string | null;
     email: string | null;
     logoPath: string | null;
+    logoDarkPath: string | null;
 };
