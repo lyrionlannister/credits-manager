@@ -30,7 +30,7 @@ class CalendarioService
     {
         $this->cuotaService->actualizarVencidas();
 
-        $inicioMes = $mes ? Carbon::createFromFormat('Y-m', $mes)->startOfMonth() : now()->startOfMonth();
+        $inicioMes = $mes ? Carbon::createFromFormat('Y-m-d', $mes.'-01')->startOfMonth() : now()->startOfMonth();
         $desde = $inicioMes->toDateString();
         $hasta = $inicioMes->copy()->endOfMonth()->toDateString();
 

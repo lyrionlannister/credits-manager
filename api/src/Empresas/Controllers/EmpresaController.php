@@ -2,6 +2,7 @@
 
 namespace App\Empresas\Controllers;
 
+use App\Empresas\Enums\VarianteLogoEmpresa;
 use App\Empresas\Requests\EditarEmpresaRequest;
 use App\Empresas\Requests\SubirLogoEmpresaRequest;
 use App\Empresas\Services\EmpresaService;
@@ -26,7 +27,10 @@ class EmpresaController extends Controller
 
     public function uploadLogo(SubirLogoEmpresaRequest $peticion): JsonResponse
     {
-        $empresa = $this->empresas->actualizarLogoPropia($peticion->file('logo'));
+        $empresa = $this->empresas->actualizarLogoPropia(
+            $peticion->file('logo'),
+            VarianteLogoEmpresa::from($peticion->validated('variante')),
+        );
 
         return response()->json(['empresa' => $empresa]);
     }

@@ -9,6 +9,7 @@ import { useCompany } from '../../company/hooks/use-company';
 import { API_ROOT } from '../../shared/constants/api';
 import { ChevronDown } from 'lucide-react';
 import { useSidebar } from '@ui/sidebar/hooks/use-sidebar';
+import { useTheme } from '@ui/theme/hooks/use-theme';
 import { NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../constants/nav-items';
 import type { NavItem, NavSubItem } from '../types/nav-item';
 import { isNavPathActive } from '../utils/is-nav-path-active';
@@ -17,7 +18,9 @@ export const AppSidebar: FC = () => {
     const { isExpanded, isMobileOpen, isHovered, setIsHovered, closeMobileSidebar } = useSidebar();
     const { user } = useAuth();
     const { company } = useCompany();
+    const { theme } = useTheme();
     const location = useLocation();
+    const logoPath = (theme === 'dark' ? company?.logoDarkPath : null) ?? company?.logoPath;
     const [openMenu, setOpenMenu] = useState<string | null>(null);
 
     const isActive = (path: string) => isNavPathActive(location.pathname, path);
@@ -65,10 +68,10 @@ export const AppSidebar: FC = () => {
         >
             <div className={`py-8 flex items-center ${!isShown ? 'lg:justify-center' : 'justify-start'}`}>
                 <Link to="/" onClick={closeMobileSidebar} className="flex items-center gap-2 text-lg font-semibold text-gray-800 dark:text-white/90">
-                    {company?.logoPath ? (
+                    {logoPath ? (
                         <img
-                            src={`${API_ROOT}/${company.logoPath}`}
-                            alt={company.name}
+                            src={`${API_ROOT}/${logoPath}`}
+                            alt={company?.name}
                             className={isShown ? 'max-h-8 max-w-40' : 'size-8 object-contain'}
                         />
                     ) : (

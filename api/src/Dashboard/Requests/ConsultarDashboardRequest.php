@@ -56,7 +56,7 @@ class ConsultarDashboardRequest extends FormRequest
     public function periodo(): CarbonImmutable
     {
         return $this->filled('periodo')
-            ? CarbonImmutable::createFromFormat('Y-m', $this->input('periodo'))->startOfMonth()
+            ? CarbonImmutable::createFromFormat('Y-m-d', $this->input('periodo').'-01')->startOfMonth()
             : CarbonImmutable::now()->startOfMonth();
     }
 }

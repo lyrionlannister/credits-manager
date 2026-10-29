@@ -6,6 +6,7 @@ use App\Auditoria\Enums\AccionAuditoria;
 use App\Auditoria\Services\EmisorAuditoria;
 use App\Contabilidad\Repositories\TipoDocumentoNegocioRepository;
 use App\Empresas\Constants\EmpresaConstants;
+use App\Empresas\Enums\VarianteLogoEmpresa;
 use App\Empresas\Models\Empresa;
 use App\Empresas\Repositories\EmpresaRepository;
 use App\Facturacion\Repositories\ParametrizacionConceptoFacturacionRepository;
@@ -136,32 +137,37 @@ class EmpresaService
         return $this->conMunicipio($empresa);
     }
 
-    public function actualizarLogoPropia(UploadedFile $logo): Empresa
+    /** El logo claro alimenta también el PDF (siempre se imprime sobre fondo claro); el oscuro es solo para la UI. */
+    public function actualizarLogoPropia(UploadedFile $logo, VarianteLogoEmpresa $variante): Empresa
     {
         $empresa = $this->obtenerPropia();
+        $campos = $variante === VarianteLogoEmpresa::Claro ? ['logo_path', 'logo_pdf_path'] : ['logo_dark_path'];
 
-        foreach ([$empresa->logo_path, $empresa->logo_pdf_path] as $anterior) {
-            if ($anterior) {
-                Storage::disk('public')->delete(str_replace('storage/', '', $anterior));
+        foreach ($campos as $campo) {
+            if ($empresa->{$campo}) {
+                Storage::disk('public')->delete(str_replace('storage/', '', $empresa->{$campo}));
             }
         }
 
-        $anteriores = $empresa->only(['logo_path', 'logo_pdf_path']);
+        $anteriores = $empresa->only($campos);
         $path = $logo->store('logos', 'public');
-        $pathPdf = $logo->getMimeType() === 'image/svg+xml' ? $this->rasterizarLogoParaPdf($path) : null;
 
-        $empresa = $this->empresas->actualizar($empresa, [
-            'logo_path' => 'storage/'.$path,
-            'logo_pdf_path' => $pathPdf ? 'storage/'.$pathPdf : null,
-        ]);
+        if ($variante === VarianteLogoEmpresa::Claro) {
+            $pathPdf = $logo->getMimeType() === 'image/svg+xml' ? $this->rasterizarLogoParaPdf($path) : null;
+            $datos = ['logo_path' => 'storage/'.$path, 'logo_pdf_path' => $pathPdf ? 'storage/'.$pathPdf : null];
+        } else {
+            $datos = ['logo_dark_path' => 'storage/'.$path];
+        }
 
-        $nuevos = $empresa->only(['logo_path', 'logo_pdf_path']);
+        $empresa = $this->empresas->actualizar($empresa, $datos);
+
+        $nuevos = $empresa->only($campos);
         $cambiados = array_keys(array_diff_assoc($nuevos, $anteriores));
 
         $this->auditoria->registrar(
             AccionAuditoria::Modificar,
             'empresas',
-            "Logo de la empresa {$empresa->nombre_empresa} actualizado",
+            "Logo ({$variante->value}) de la empresa {$empresa->nombre_empresa} actualizado",
             'empresa',
             $empresa->id,
             anteriores: array_intersect_key($anteriores, array_flip($cambiados)),

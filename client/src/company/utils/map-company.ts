@@ -22,5 +22,6 @@ export function mapCompany(apiCompany: ApiCompany): Company {
         phone: apiCompany.telefono,
         email: apiCompany.correo,
         logoPath: apiCompany.logo_path,
+        logoDarkPath: apiCompany.logo_dark_path,
     };
 }

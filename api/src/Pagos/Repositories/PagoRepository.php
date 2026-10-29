@@ -72,7 +72,7 @@ class PagoRepository extends BaseRepository
             return $consulta;
         }
 
-        $inicio = CarbonImmutable::createFromFormat('Y-m', $mes, 'America/Bogota')->startOfMonth();
+        $inicio = CarbonImmutable::createFromFormat('Y-m-d', $mes.'-01', 'America/Bogota')->startOfMonth();
 
         return $consulta->where('pagos.fecha_pago', '>=', $inicio)->where('pagos.fecha_pago', '<', $inicio->addMonth());
     }
