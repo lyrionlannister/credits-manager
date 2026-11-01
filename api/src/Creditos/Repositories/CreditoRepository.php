@@ -19,16 +19,6 @@ class CreditoRepository extends BaseRepository
         parent::__construct($credito);
     }
 
-    public function activosConCliente(): Collection
-    {
-        return $this->consulta()
-            ->where('estado', EstadoCredito::Desembolsado)
-            ->with('cliente.tercero')
-            ->get()
-            ->sortBy(fn (Credito $credito) => $credito->cliente->tercero->nombre)
-            ->values();
-    }
-
     /**
      * Créditos desembolsados de la empresa, con su cliente. La empresa y el asesor van explícitos: la cartera
      * para exportar corre en el worker, sin sesión, donde los scopes no filtran.

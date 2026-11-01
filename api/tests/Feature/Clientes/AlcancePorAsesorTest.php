@@ -187,6 +187,15 @@ class AlcancePorAsesorTest extends TestCase
         $this->getJson("/api/v1/clientes/{$this->clienteB->id}")->assertOk();
     }
 
+    public function test_con_alcance_global_el_total_de_cartera_sigue_siendo_solo_del_asesor(): void
+    {
+        $this->asesorA->update(['es_asesor_global' => true]);
+
+        $respuesta = $this->getJson('/api/v1/cartera')->assertOk();
+
+        $this->sinNombres($respuesta->getContent(), 'Cliente de B', 'Cliente de A');
+    }
+
     public function test_los_demas_roles_no_quedan_limitados_por_asesor(): void
     {
         $empresa = Empresa::findOrFail($this->asesorA->empresa_id);

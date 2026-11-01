@@ -76,6 +76,12 @@ class Usuario extends BaseModel implements AuthenticatableContract
         return $this->restringidoAClientesPropios() ? $this->id : null;
     }
 
+    /** El total de cartera es siempre individual para un asesor, incluso con alcance global de clientes. */
+    public function idAsesorParaCartera(): ?int
+    {
+        return $this->rol?->nombre === UsuarioConstants::ROL_ASESOR ? $this->id : null;
+    }
+
     public function tienePermiso(string $modulo, string $accion): bool
     {
         if ($this->rol?->nombre === UsuarioConstants::ROL_ADMIN) {
