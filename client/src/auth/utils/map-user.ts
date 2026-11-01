@@ -28,5 +28,6 @@ export function mapUser(apiUser: ApiUser): User {
         role: apiUser.es_superadmin ? 'Super Admin' : (apiUser.rol?.nombre ?? ''),
         permissions: buildEffectivePermissions(apiUser),
         isSuperAdmin: apiUser.es_superadmin,
+        mustChangePassword: apiUser.debe_cambiar_clave,
     };
 }

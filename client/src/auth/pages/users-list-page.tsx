@@ -79,6 +79,7 @@ export const UsersListPage: FC = () => {
         canDelete,
         canChangePassword,
         canManageAdmins: isCompanyAdmin(currentUser),
+        currentUserId: currentUser?.id,
         onEdit: handleEdit,
         onDelete: setUserToDelete,
         onChangePassword: setUserToChangePassword,

@@ -14,4 +14,5 @@ export type User = {
     role: Role;
     permissions: ModulePermission[];
     isSuperAdmin: boolean;
+    mustChangePassword: boolean;
 };

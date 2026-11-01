@@ -42,9 +42,12 @@ export const ChangePasswordModal: FC<ChangePasswordModalProps> = ({ user, onClos
 
     return (
         <Modal isOpen onClose={onClose} size="sm">
-            <h4 className="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90">
+            <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">
                 Cambiar contraseña de {user.nombre}
             </h4>
+            <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+                Es temporal: {user.nombre} deberá cambiarla al iniciar sesión.
+            </p>
 
             <form onSubmit={handleSubmit}>
                 <div className="space-y-5">

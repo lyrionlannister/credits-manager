@@ -10,6 +10,7 @@ import { RequireAuditAccess } from './auth/components/require-audit-access';
 import { RequireAuth } from './auth/components/require-auth';
 import { RequireAnyPermission } from './auth/components/require-any-permission';
 import { RequireModulePermission } from './auth/components/require-module-permission';
+import { RequirePasswordChange } from './auth/components/require-password-change';
 import { RequireSuperAdmin } from './auth/components/require-super-admin';
 import { RequireCompany } from './company/components/require-company';
 import { AppLayout } from './layout/components/app-layout';
@@ -61,6 +62,7 @@ const SystemHealthPage = lazyPage(() => import('./monitoring/pages/system-health
 const ScheduledTasksPage = lazyPage(() => import('./monitoring/pages/scheduled-tasks-page'), 'ScheduledTasksPage');
 const ActiveSessionsPage = lazyPage(() => import('./security/pages/active-sessions-page'), 'ActiveSessionsPage');
 const AccessHistoryPage = lazyPage(() => import('./security/pages/access-history-page'), 'AccessHistoryPage');
+const CompanyAdminsPage = lazyPage(() => import('./security/pages/company-admins-page'), 'CompanyAdminsPage');
 const CalendarPage = lazyPage(() => import('./calendar/pages/calendar-page'), 'CalendarPage');
 const TaxObligationsPage = lazyPage(() => import('./tax-obligations/pages/tax-obligations-page'), 'TaxObligationsPage');
 const CreateEconomicActivityPage = lazyPage(() => import('./expenses/pages/create-economic-activity-page'), 'CreateEconomicActivityPage');
@@ -143,9 +145,11 @@ const routes: RouteObject[] = [
             {
                 element: (
                     <RequireAuth>
-                        <RequireCompany>
-                            <AppLayout />
-                        </RequireCompany>
+                        <RequirePasswordChange>
+                            <RequireCompany>
+                                <AppLayout />
+                            </RequireCompany>
+                        </RequirePasswordChange>
                     </RequireAuth>
                 ),
                 children: [
@@ -472,6 +476,14 @@ const routes: RouteObject[] = [
                         element: (
                             <RequireSuperAdmin>
                                 <AccessHistoryPage />
+                            </RequireSuperAdmin>
+                        ),
+                    },
+                    {
+                        path: 'seguridad/admins-empresa',
+                        element: (
+                            <RequireSuperAdmin>
+                                <CompanyAdminsPage />
                             </RequireSuperAdmin>
                         ),
                     },

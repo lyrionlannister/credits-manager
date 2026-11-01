@@ -8,12 +8,17 @@ function fila(rol: string): ApiUserListItem {
     return { id: 1, nombre: 'Usuario', usuario: 'usuario', rol: { id: 1, nombre: rol, descripcion: null }, activo: true, creado_en: null };
 }
 
-function renderAcciones(rol: string, canManageAdmins: boolean, permisos: { canEdit?: boolean; canDelete?: boolean } = {}): void {
+function renderAcciones(
+    rol: string,
+    canManageAdmins: boolean,
+    permisos: { canEdit?: boolean; canDelete?: boolean; canChangePassword?: boolean; currentUserId?: number } = {},
+): void {
     const columnas = buildUserTableColumns({
         canEdit: permisos.canEdit ?? true,
         canDelete: permisos.canDelete ?? true,
-        canChangePassword: false,
+        canChangePassword: permisos.canChangePassword ?? false,
         canManageAdmins,
+        currentUserId: permisos.currentUserId,
         onEdit: vi.fn(),
         onDelete: vi.fn(),
         onChangePassword: vi.fn(),
@@ -43,5 +48,17 @@ describe('buildUserTableColumns', () => {
 
         expect(screen.getByLabelText('Editar')).toBeTruthy();
         expect(screen.queryByLabelText('Eliminar')).toBeNull();
+    });
+
+    it('no ofrece cambiar la propia contraseña por esta fila', () => {
+        renderAcciones('cartera', true, { canChangePassword: true, currentUserId: 1 });
+
+        expect(screen.queryByLabelText('Cambiar contraseña')).toBeNull();
+    });
+
+    it('sí ofrece cambiar la contraseña de otro usuario', () => {
+        renderAcciones('cartera', true, { canChangePassword: true, currentUserId: 2 });
+
+        expect(screen.getByLabelText('Cambiar contraseña')).toBeTruthy();
     });
 });

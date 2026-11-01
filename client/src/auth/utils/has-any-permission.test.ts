@@ -10,6 +10,7 @@ const lector: User = {
     role: 'consulta',
     permissions: [{ modulo: 'facturacion', accion: 'listar_notas_credito' }],
     isSuperAdmin: false,
+    mustChangePassword: false,
 };
 
 describe('hasAnyPermission', () => {

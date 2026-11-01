@@ -15,12 +15,17 @@ export const AuthProvider: FC<WithChildrenProps> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const { sendRequest } = useSendRequest();
 
+    const refreshUser = useCallback(
+        () =>
+            sendRequest<{ usuario: ApiUser }>('/me')
+                .then((data) => setUser(mapUser(data.usuario)))
+                .catch(() => setUser(null)),
+        [sendRequest],
+    );
+
     useEffect(() => {
-        sendRequest<{ usuario: ApiUser }>('/me')
-            .then((data) => setUser(mapUser(data.usuario)))
-            .catch(() => setUser(null))
-            .finally(() => setIsLoading(false));
-    }, [sendRequest]);
+        refreshUser().finally(() => setIsLoading(false));
+    }, [refreshUser]);
 
     useEffect(() => {
         const handleSessionExpired = () => {
@@ -56,5 +61,5 @@ export const AuthProvider: FC<WithChildrenProps> = ({ children }) => {
         }
     }, [sendRequest]);
 
-    return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;
+    return <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser }}>{children}</AuthContext.Provider>;
 };
