@@ -20,9 +20,9 @@ class CarteraController extends Controller
         protected ReporteEmpleadorService $reportesEmpleador,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $peticion): JsonResponse
     {
-        return response()->json($this->cartera->resumen());
+        return response()->json($this->cartera->resumen($peticion->user()));
     }
 
     public function exportar(ExportarCarteraRequest $peticion): JsonResponse

@@ -29,11 +29,12 @@ class CarteraService
         protected ExportacionService $exportaciones,
     ) {}
 
-    public function resumen(): array
+    /** El total de cartera es siempre el del propio asesor (`idAsesorParaCartera`), aunque vea todos los clientes. */
+    public function resumen(Usuario $usuario): array
     {
         $this->cuotaService->actualizarVencidas();
 
-        $clasificados = $this->clasificar($this->creditos->activosConCliente());
+        $clasificados = $this->clasificar($this->creditos->activosDeEmpresa((int) $usuario->empresa_id, $usuario->idAsesorParaCartera()));
         $alDia = $clasificados['al_dia'];
         $enMora = $clasificados['en_mora'];
 
