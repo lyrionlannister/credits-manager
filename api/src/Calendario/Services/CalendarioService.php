@@ -7,6 +7,7 @@ use App\Creditos\Models\Cuota;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Services\CuotaService;
+use App\Empleadores\Repositories\EmpleadorRepository;
 use Carbon\Carbon;
 
 /**
@@ -21,12 +22,13 @@ class CalendarioService
         protected CuotaService $cuotaService,
         protected CuotaRepository $cuotas,
         protected CreditoRepository $creditos,
+        protected EmpleadorRepository $empleadores,
     ) {}
 
     /**
      * @param  string|null  $mes  Formato `YYYY-MM`. Si no se indica, usa el mes actual.
      */
-    public function agenda(?string $mes = null): array
+    public function agenda(?string $mes = null, ?int $empleadorId = null): array
     {
         $this->cuotaService->actualizarVencidas();
 
@@ -34,12 +36,13 @@ class CalendarioService
         $desde = $inicioMes->toDateString();
         $hasta = $inicioMes->copy()->endOfMonth()->toDateString();
 
-        $cuotas = $this->cuotas->delMesDeCreditosActivos($desde, $hasta);
+        $cuotas = $this->cuotas->delMesDeCreditosActivos($desde, $hasta, $empleadorId);
         $conteos = $this->creditos->conteoPorClientes(
             $cuotas->map(fn (Cuota $cuota) => $cuota->credito->cliente_id)->unique()->values()->all(),
         );
 
         return [
+            'empleadores' => $this->empleadores->conClientes(),
             'cuotas' => $cuotas
                 ->map(function (Cuota $cuota) use ($conteos) {
                     $cliente = $cuota->credito->cliente;

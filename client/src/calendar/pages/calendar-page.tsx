@@ -10,10 +10,13 @@ import { useState } from 'react';
 import { useResource } from '../../shared/hooks/use-resource';
 import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
 import { PageSkeleton } from '@ui/skeleton/components/page-skeleton';
+import { CalendarFilters } from '../components/calendar-filters';
 import { CalendarInstallmentModal } from '../components/calendar-installment-modal';
 import { LEGEND_ITEMS } from '../constants/legend-items';
 import { buildCalendarEvents } from '../utils/build-calendar-events';
+import { filterInstallmentsByRange } from '../utils/filter-installments-by-range';
 import type { ApiCalendarAgenda } from '../types/api-calendar-agenda';
+import type { CalendarRange } from '../types/calendar-range';
 import type { CalendarInstallmentColor } from '../types/api-calendar-installment';
 import type { CalendarEventProps } from '../types/calendar-event';
 
@@ -24,8 +27,15 @@ function mesActualEnCurso(): string {
 
 export const CalendarPage: FC = () => {
     const [mes, setMes] = useState(mesActualEnCurso);
+    const [rango, setRango] = useState<CalendarRange>('mes');
+    const [empleadorId, setEmpleadorId] = useState<number | null>(null);
 
-    const { data: agenda, error } = useResource<ApiCalendarAgenda>(`/calendario?mes=${mes}`);
+    const parametros = new URLSearchParams({ mes });
+    if (empleadorId) {
+        parametros.set('empleador_id', String(empleadorId));
+    }
+
+    const { data: agenda, error } = useResource<ApiCalendarAgenda>(`/calendario?${parametros.toString()}`);
 
     /**
      * `useResource` pone `data` en `null` mientras carga el nuevo mes (para que otras
@@ -75,17 +85,26 @@ export const CalendarPage: FC = () => {
         return <PageSkeleton />;
     }
 
-    const events = buildCalendarEvents(agendaVisible);
+    const cuotasFiltradas = filterInstallmentsByRange(agendaVisible.cuotas, rango);
+    const events = buildCalendarEvents(cuotasFiltradas);
 
     return (
         <div className="flex flex-col pb-6">
             <PageBreadcrumb pageTitle="Calendario" />
 
+            <CalendarFilters
+                rango={rango}
+                onChangeRango={setRango}
+                empleadores={agendaVisible.empleadores}
+                empleadorId={empleadorId}
+                onChangeEmpleadorId={setEmpleadorId}
+            />
+
             <div className="mb-4 flex flex-wrap items-center gap-4">
                 {LEGEND_ITEMS.map((item) => (
                     <div key={item.color} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                         <span className={`h-2.5 w-2.5 rounded-full ${item.dotClass}`} />
-                        {item.label} ({agendaVisible.cuotas.filter((cuota) => cuota.color === item.color).length})
+                        {item.label} ({cuotasFiltradas.filter((cuota) => cuota.color === item.color).length})
                     </div>
                 ))}
             </div>
