@@ -106,6 +106,37 @@ class CalendarioControllerTest extends TestCase
         $this->assertCount(0, $respuesta->json('cuotas'));
     }
 
+    public function test_filtra_por_empleador(): void
+    {
+        $this->actingAsAdmin();
+        $empleadorA = $this->crearEmpleador(['nombre' => 'Empleador A']);
+        $empleadorB = $this->crearEmpleador(['nombre' => 'Empleador B']);
+        $clienteA = $this->crearCliente(['empleador_id' => $empleadorA->id]);
+        $clienteB = $this->crearCliente(['empleador_id' => $empleadorB->id]);
+
+        $mesObjetivo = now()->addMonths(2);
+        $cuotaA = $this->crearCuota($this->crearCredito($clienteA), ['numero_cuota' => 1, 'fecha_vencimiento' => $mesObjetivo->copy()->day(5)]);
+        $this->crearCuota($this->crearCredito($clienteB), ['numero_cuota' => 1, 'fecha_vencimiento' => $mesObjetivo->copy()->day(10)]);
+
+        $respuesta = $this->getJson('/api/v1/calendario?mes='.$mesObjetivo->format('Y-m').'&empleador_id='.$empleadorA->id);
+
+        $respuesta->assertStatus(200);
+        $this->assertSame([$cuotaA->id], collect($respuesta->json('cuotas'))->pluck('id')->all());
+    }
+
+    public function test_incluye_los_empleadores_con_clientes_para_el_selector(): void
+    {
+        $this->actingAsAdmin();
+        $empleadorConCliente = $this->crearEmpleador(['nombre' => 'Empleador con cliente']);
+        $this->crearEmpleador(['nombre' => 'Empleador sin clientes']);
+        $this->crearCliente(['empleador_id' => $empleadorConCliente->id]);
+
+        $respuesta = $this->getJson('/api/v1/calendario');
+
+        $respuesta->assertStatus(200);
+        $this->assertSame([$empleadorConCliente->id], collect($respuesta->json('empleadores'))->pluck('id')->all());
+    }
+
     public function test_incluye_cuotas_pagadas_desde_pagoservice_con_color_success(): void
     {
         $this->actingAsAdmin();

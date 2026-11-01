@@ -1,9 +1,9 @@
 import { formatMoney } from '../../shared/utils/format-money';
-import type { ApiCalendarAgenda } from '../types/api-calendar-agenda';
+import type { ApiCalendarInstallment } from '../types/api-calendar-installment';
 import type { CalendarEvent } from '../types/calendar-event';
 
-export function buildCalendarEvents(agenda: ApiCalendarAgenda): CalendarEvent[] {
-    return agenda.cuotas.map((cuota) => ({
+export function buildCalendarEvents(cuotas: ApiCalendarInstallment[]): CalendarEvent[] {
+    return cuotas.map((cuota) => ({
         id: `cuota-${cuota.id}`,
         title: `${cuota.cliente_nombre} · Cuota #${cuota.numero_cuota} · ${formatMoney(cuota.saldo)}`,
         start: cuota.fecha_vencimiento,

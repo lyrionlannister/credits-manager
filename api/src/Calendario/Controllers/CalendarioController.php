@@ -20,6 +20,6 @@ class CalendarioController extends Controller
             throw ValidationException::withMessages(['mes' => __('validation.custom.mes.formato_invalido')]);
         }
 
-        return response()->json($this->calendario->agenda($mes));
+        return response()->json($this->calendario->agenda($mes, $peticion->integer('empleador_id') ?: null));
     }
 }

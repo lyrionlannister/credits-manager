@@ -213,11 +213,13 @@ class CuotaRepository extends BaseRepository
      * verde en el mes. Incluye `Pagado` porque un crédito liquidado en su última cuota pasa
      * de `Desembolsado` a `Pagado` en el mismo instante en que esa cuota se marca pagada.
      */
-    public function delMesDeCreditosActivos(string $desde, string $hasta): Collection
+    public function delMesDeCreditosActivos(string $desde, string $hasta, ?int $empleadorId = null): Collection
     {
         return $this->consulta()
             ->whereBetween('fecha_vencimiento', [$desde, $hasta])
-            ->whereHas('credito', fn ($consultaCredito) => $consultaCredito->whereIn('estado', [EstadoCredito::Desembolsado, EstadoCredito::Pagado]))
+            ->whereHas('credito', fn ($consultaCredito) => $consultaCredito
+                ->whereIn('estado', [EstadoCredito::Desembolsado, EstadoCredito::Pagado])
+                ->when($empleadorId, fn ($consultaCliente) => $consultaCliente->whereHas('cliente', fn ($consultaCliente) => $consultaCliente->where('empleador_id', $empleadorId))))
             ->with(['credito.cliente.tercero'])
             ->get()
             ->sortBy(fn (Cuota $cuota) => $cuota->fecha_vencimiento->toDateString())
