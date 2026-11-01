@@ -293,6 +293,7 @@ return [
         'usuario' => [
             'credenciales_invalidas' => 'Usuario o contraseña incorrectos.',
             'unico_admin_activo' => 'No puedes quitarte el rol de administrador o desactivarte siendo el único administrador activo.',
+            'no_propia_clave' => 'No puedes restablecer tu propia contraseña por aquí; usa "Cambiar contraseña" en tu perfil.',
             'alcance_global_solo_asesor' => 'Solo un usuario con el rol asesor puede tener alcance global.',
         ],
         'rol' => [

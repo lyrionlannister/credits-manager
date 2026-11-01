@@ -71,6 +71,7 @@ use App\Respaldos\Controllers\ConfiguracionRespaldoExternoController;
 use App\Respaldos\Controllers\DescargaBaseController;
 use App\Respaldos\Controllers\ResumenRespaldosController;
 use App\Seguridad\Controllers\AccesoController;
+use App\Seguridad\Controllers\AdminEmpresaController;
 use App\Seguridad\Controllers\SesionActivaController;
 use App\Terceros\Controllers\TerceroController;
 use App\Usuarios\Controllers\PermisoController;
@@ -115,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/seguridad/sesiones', [SesionActivaController::class, 'index'])->middleware('superadmin');
     Route::delete('/seguridad/sesiones/empresa/{empresa}', [SesionActivaController::class, 'destroyEmpresa'])->middleware('superadmin');
     Route::delete('/seguridad/sesiones/{sesion}', [SesionActivaController::class, 'destroy'])->middleware('superadmin');
+
+    Route::get('/seguridad/admins-empresa', [AdminEmpresaController::class, 'index'])->middleware('superadmin');
+    Route::patch('/seguridad/admins-empresa/{usuario}/clave', [AdminEmpresaController::class, 'resetearClave'])->middleware('superadmin');
 
     Route::get('/respaldos/base', [DescargaBaseController::class, 'base'])->middleware('superadmin');
     Route::get('/respaldos/empresa', [DescargaBaseController::class, 'empresa'])->middleware('admin');

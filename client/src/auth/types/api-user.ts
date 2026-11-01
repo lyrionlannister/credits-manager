@@ -10,4 +10,5 @@ export type ApiUser = {
     permisos_extra: ApiPermisoExcepcion[];
     activo: boolean;
     es_superadmin: boolean;
+    debe_cambiar_clave: boolean;
 };

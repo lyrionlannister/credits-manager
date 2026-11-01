@@ -13,6 +13,7 @@ function usuario(overrides: Partial<User> = {}): User {
         role: 'cartera',
         permissions: [],
         isSuperAdmin: false,
+        mustChangePassword: false,
         ...overrides,
     };
 }

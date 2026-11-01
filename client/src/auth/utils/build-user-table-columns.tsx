@@ -9,6 +9,7 @@ export function buildUserTableColumns({
     canDelete,
     canChangePassword,
     canManageAdmins,
+    currentUserId,
     onEdit,
     onDelete,
     onChangePassword,
@@ -69,7 +70,7 @@ export function buildUserTableColumns({
                             <ActionButton icon={<Trash2 className="size-5" />} label="Eliminar" variant="danger" onClick={() => onDelete(row)} />
                         )}
                         {canEdit && isManageable && <ActionButton icon={<Pencil className="size-5" />} label="Editar" onClick={() => onEdit(row)} />}
-                        {canChangePassword && (
+                        {canChangePassword && row.id !== currentUserId && (
                             <ActionButton
                                 icon={<KeyRound className="size-5" />}
                                 label="Cambiar contraseña"

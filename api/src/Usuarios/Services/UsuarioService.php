@@ -129,9 +129,20 @@ class UsuarioService
         return $permisos;
     }
 
+    /**
+     * La clave que pone el admin es temporal: el usuario la cambia en su próximo login
+     * (`AuthService::cambiarClavePropia`). La propia la cambia el admin por `AuthController::cambiarClave`,
+     * que sí exige la clave actual; este endpoint es solo para restablecer la de un tercero.
+     */
     public function cambiarClave(Usuario $usuario, string $claveNueva): Usuario
     {
-        $usuario = $this->usuarios->actualizar($usuario, ['password_hash' => $claveNueva]);
+        if (Auth::id() === $usuario->id) {
+            throw ValidationException::withMessages([
+                'clave' => __('validation.custom.usuario.no_propia_clave'),
+            ]);
+        }
+
+        $usuario = $this->usuarios->actualizar($usuario, ['password_hash' => $claveNueva, 'debe_cambiar_clave' => true]);
 
         $this->auditoria->registrar(AccionAuditoria::Modificar, AuditoriaConstants::MODULO_USUARIOS, "Contraseña de {$usuario->usuario} restablecida por el administrador", 'usuario', $usuario->id);
 

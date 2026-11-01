@@ -5,6 +5,7 @@ namespace Tests\Feature\Usuarios;
 use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\TestCase;
 
@@ -104,6 +105,40 @@ class UsuarioControllerTest extends TestCase
 
         $respuesta->assertStatus(200);
         $this->assertDatabaseHas('usuarios', ['id' => $usuario->id, 'nombre' => 'Nombre nuevo']);
+    }
+
+    public function test_admin_restablece_la_clave_de_un_usuario_como_temporal(): void
+    {
+        $this->actingAsAdmin();
+        $rol = Rol::create(['nombre' => 'asesor_test']);
+        $usuario = $this->crearUsuario($rol);
+
+        $respuesta = $this->patchJson("/api/v1/usuarios/{$usuario->id}/clave", ['clave' => 'ClaveTemporal123!']);
+
+        $respuesta->assertStatus(204);
+        $usuario->refresh();
+        $this->assertTrue($usuario->debe_cambiar_clave);
+        $this->assertTrue(Hash::check('ClaveTemporal123!', $usuario->password_hash));
+    }
+
+    public function test_admin_no_puede_restablecer_su_propia_clave_por_este_endpoint(): void
+    {
+        $admin = $this->actingAsAdmin();
+
+        $respuesta = $this->patchJson("/api/v1/usuarios/{$admin->id}/clave", ['clave' => 'ClaveTemporal123!']);
+
+        $respuesta->assertStatus(422)->assertJsonValidationErrors('clave');
+    }
+
+    public function test_asesor_no_puede_restablecer_claves(): void
+    {
+        $this->actingAsAsesor();
+        $rol = Rol::create(['nombre' => 'asesor_test']);
+        $usuario = $this->crearUsuario($rol);
+
+        $respuesta = $this->patchJson("/api/v1/usuarios/{$usuario->id}/clave", ['clave' => 'ClaveTemporal123!']);
+
+        $respuesta->assertStatus(403);
     }
 
     public function test_usuario_inexistente_devuelve_404(): void

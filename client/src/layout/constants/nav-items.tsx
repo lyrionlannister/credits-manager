@@ -65,6 +65,7 @@ export const SUPERADMIN_NAV_ITEMS: NavItem[] = [
             { name: "Recuperación", path: "/recuperacion-auditoria", icon: ArchiveRestore },
             { name: "Sesiones", path: "/seguridad/sesiones", icon: MonitorSmartphone },
             { name: "Accesos", path: "/seguridad/accesos", icon: KeyRound },
+            { name: "Administradores", path: "/seguridad/admins-empresa", icon: UserCog },
         ],
     },
     { name: "Respaldos", icon: DatabaseBackup, path: "/respaldos" },

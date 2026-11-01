@@ -105,6 +105,21 @@ class AuthControllerTest extends TestCase
         $this->assertTrue(Hash::check('ClaveNueva123!', $usuario->fresh()->password_hash));
     }
 
+    public function test_cambiar_la_clave_propia_quita_la_marca_de_clave_temporal(): void
+    {
+        $usuario = $this->crearUsuarioConClave('ClaveVieja123!');
+        $usuario->update(['debe_cambiar_clave' => true]);
+        $this->actingAs($usuario, 'sanctum');
+
+        $respuesta = $this->patchJson('/api/v1/me/clave', [
+            'clave_actual' => 'ClaveVieja123!',
+            'clave_nueva' => 'ClaveNueva123!',
+        ]);
+
+        $respuesta->assertStatus(204);
+        $this->assertFalse($usuario->fresh()->debe_cambiar_clave);
+    }
+
     public function test_rechaza_cambio_de_clave_con_clave_actual_incorrecta(): void
     {
         $usuario = $this->crearUsuarioConClave('ClaveVieja123!');
