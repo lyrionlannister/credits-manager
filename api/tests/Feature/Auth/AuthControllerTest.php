@@ -120,6 +120,29 @@ class AuthControllerTest extends TestCase
         $this->assertFalse($usuario->fresh()->debe_cambiar_clave);
     }
 
+    public function test_usuario_con_clave_temporal_no_puede_usar_otras_rutas(): void
+    {
+        $usuario = $this->crearUsuarioConClave('ClaveVieja123!');
+        $usuario->update(['debe_cambiar_clave' => true]);
+        $this->actingAs($usuario, 'sanctum');
+
+        $respuesta = $this->getJson('/api/v1/empresa');
+
+        $respuesta->assertStatus(403);
+    }
+
+    public function test_usuario_con_clave_temporal_puede_consultar_su_perfil_y_salir(): void
+    {
+        $usuario = $this->crearUsuarioConClave('ClaveVieja123!');
+        $usuario->update(['debe_cambiar_clave' => true]);
+        $this->actingAs($usuario, 'sanctum');
+
+        $referer = 'https://'.collect(config('sanctum.stateful'))->first();
+
+        $this->getJson('/api/v1/me')->assertStatus(200);
+        $this->withHeader('Referer', $referer)->postJson('/api/v1/logout')->assertStatus(204);
+    }
+
     public function test_rechaza_cambio_de_clave_con_clave_actual_incorrecta(): void
     {
         $usuario = $this->crearUsuarioConClave('ClaveVieja123!');

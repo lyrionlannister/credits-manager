@@ -21,6 +21,8 @@ class EditarUsuarioRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:100'],
+            // Unicidad global intencional: el login (`AuthService`/`UsuarioRepository::buscarPorUsuario`) busca por
+            // `usuario` sin empresa_id, así que dos empresas no pueden compartir el mismo nombre de usuario.
             'usuario' => [
                 'required',
                 'string',

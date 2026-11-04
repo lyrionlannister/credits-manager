@@ -22,6 +22,8 @@ class CrearUsuarioRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:100'],
+            // Unicidad global intencional: el login (`AuthService`/`UsuarioRepository::buscarPorUsuario`) busca por
+            // `usuario` sin empresa_id, así que dos empresas no pueden compartir el mismo nombre de usuario.
             'usuario' => ['required', 'string', 'max:50', 'unique:usuarios,usuario'],
             'clave' => ['required', 'string', Password::min(8)->letters()->numbers()->symbols()],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')->where('empresa_id', $this->user()->empresa_id)],

@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 class EmpresaService
@@ -202,7 +203,13 @@ class EmpresaService
         $pathPng = Str::replaceLast('.svg', '.png', $pathSvg);
 
         $proceso = new Process(['rsvg-convert', '--width', '480', $disco->path($pathSvg), '-o', $disco->path($pathPng)]);
-        $proceso->run();
+        $proceso->setTimeout(10);
+
+        try {
+            $proceso->run();
+        } catch (ProcessTimedOutException) {
+            return null;
+        }
 
         return $proceso->isSuccessful() ? $pathPng : null;
     }
