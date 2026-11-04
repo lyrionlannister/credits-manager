@@ -223,7 +223,13 @@ jobs:
       - name: Namespace de ghcr.io
         run: echo "GHCR_NS=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Una vez al día: evita que la capa `apk upgrade` de los Dockerfile reutilice el cache-from
+      # de GH Actions de antes de que Alpine publicara el parche de un CVE nuevo (Trivy, abajo,
+      # seguiría viendo la versión vieja aunque el paquete arreglado ya exista).
+      - name: Fecha para invalidar el cache de apk upgrade
+        run: echo "APK_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
       # push: false siempre aquí — escanea antes de publicar, nunca al revés. Si Trivy encuentra
       # CRITICAL/HIGH la imagen nunca llega a ghcr.io.
@@ -235,6 +241,7 @@ jobs:
           push: false
           load: true
           tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-api:${{ github.sha }}
+          build-args: APK_CACHE_DATE=${{ env.APK_CACHE_DATE }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -246,6 +253,7 @@ jobs:
           push: false
           load: true
           tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-nginx:${{ github.sha }}
+          build-args: APK_CACHE_DATE=${{ env.APK_CACHE_DATE }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,mode=max,scope=nginx
 
