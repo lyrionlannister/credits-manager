@@ -14,9 +14,15 @@ RUN composer dump-autoload --optimize --no-dev
 FROM docker.io/library/php:8.5-fpm-alpine
 WORKDIR /var/www/html
 
+# `APK_CACHE_DATE` (ci.yml) invalida esta capa una vez al día: si no, el cache-from de GH Actions
+# reutiliza un `apk upgrade` de antes de que Alpine publicara el parche de un CVE nuevo y Trivy
+# sigue fallando con la versión vieja aunque el paquete arreglado ya esté disponible.
+ARG APK_CACHE_DATE=unset
+
 # opcache ya no se instala: PHP 8.5 lo compila estático en el binario (zend_extension innecesario,
 # docker-php-ext-install opcache falla porque configure ya no expone --enable-opcache).
-RUN apk upgrade --no-cache \
+RUN echo "apk cache bust: ${APK_CACHE_DATE}" \
+    && apk upgrade --no-cache \
     && apk add --no-cache icu-dev libzip-dev oniguruma-dev libpng-dev libjpeg-turbo-dev mysql-client mariadb-connector-c rsvg-convert \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install pdo_mysql mbstring bcmath intl zip pcntl posix gd \

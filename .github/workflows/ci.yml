@@ -28,10 +28,16 @@ jobs:
       scripts: ${{ steps.filtro.outputs.scripts }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
+      # token vacío: usa diff local de git en vez de listFiles() por API. Dependabot corre con un
+      # GITHUB_TOKEN de solo lectura sin permiso pull-requests, así que la llamada a la API
+      # fallaba con "Resource not accessible by integration" en toda PR suya.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filtro
         with:
+          token: ''
           filters: |
             api:
               - 'api/**'
@@ -223,7 +229,13 @@ jobs:
       - name: Namespace de ghcr.io
         run: echo "GHCR_NS=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Una vez al día: evita que la capa `apk upgrade` de los Dockerfile reutilice el cache-from
+      # de GH Actions de antes de que Alpine publicara el parche de un CVE nuevo (Trivy, abajo,
+      # seguiría viendo la versión vieja aunque el paquete arreglado ya exista).
+      - name: Fecha para invalidar el cache de apk upgrade
+        run: echo "APK_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
       # push: false siempre aquí — escanea antes de publicar, nunca al revés. Si Trivy encuentra
       # CRITICAL/HIGH la imagen nunca llega a ghcr.io.
@@ -235,6 +247,7 @@ jobs:
           push: false
           load: true
           tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-api:${{ github.sha }}
+          build-args: APK_CACHE_DATE=${{ env.APK_CACHE_DATE }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -246,6 +259,7 @@ jobs:
           push: false
           load: true
           tags: ghcr.io/${{ env.GHCR_NS }}/credits-manager-nginx:${{ github.sha }}
+          build-args: APK_CACHE_DATE=${{ env.APK_CACHE_DATE }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,mode=max,scope=nginx
 

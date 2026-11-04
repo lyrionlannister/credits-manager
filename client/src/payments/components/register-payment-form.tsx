@@ -6,6 +6,7 @@ import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { formatDateEs } from '../../shared/utils/format-date-es';
 import { formatMoney } from '../../shared/utils/format-money';
 import { Button } from '@ui/button/components/button';
+import { DatePicker } from '@ui/forms/components/date-picker';
 import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Select } from '@ui/forms/components/select';
@@ -25,6 +26,7 @@ export const RegisterPaymentForm: FC<RegisterPaymentFormProps> = ({ detalle }) =
 
     const [valorPago, setValorPago] = useState('');
     const [formaPago, setFormaPago] = useState<PaymentMethod>('efectivo');
+    const [fechaPago, setFechaPago] = useState('');
     const [observacion, setObservacion] = useState('');
 
     const [error, setError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export const RegisterPaymentForm: FC<RegisterPaymentFormProps> = ({ detalle }) =
         try {
             await sendRequest<{ pago: ApiPayment }>(`/creditos/${credito.id}/pagos`, {
                 method: 'POST',
-                body: { valor_pago: valorPago, forma_pago: formaPago, observacion: observacion || null },
+                body: { valor_pago: valorPago, forma_pago: formaPago, fecha_pago: fechaPago || null, observacion: observacion || null },
             });
 
             navigate(`/pagos/creditos/${credito.id}`, { replace: true, state: { message: 'Pago registrado correctamente.' } });
@@ -102,6 +104,17 @@ export const RegisterPaymentForm: FC<RegisterPaymentFormProps> = ({ detalle }) =
                                     options={PAYMENT_METHOD_OPTIONS}
                                     defaultValue={formaPago}
                                     onChange={(value) => setFormaPago(value as PaymentMethod)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label htmlFor="fecha-pago">Fecha de pago (opcional)</Label>
+                                <DatePicker
+                                    id="fecha-pago"
+                                    name="fecha-pago"
+                                    value={fechaPago}
+                                    onChange={setFechaPago}
+                                    maxDate={new Date().toISOString().slice(0, 10)}
                                 />
                             </div>
 
