@@ -177,6 +177,9 @@ return [
                 'invalido' => 'El dígito de verificación no corresponde al NIT.',
             ],
         ],
+        'logo' => [
+            'svg_no_seguro' => 'El SVG contiene elementos no permitidos (script, referencias externas o manejadores de evento). Sube un logo sin esos elementos.',
+        ],
         'metas' => [
             'periodo_tipo_repetido' => 'Ya existe una meta de este tipo para el período.',
             'sin_meta' => 'No existe una meta de este tipo para el período.',
