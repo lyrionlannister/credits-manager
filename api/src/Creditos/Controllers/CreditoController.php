@@ -9,6 +9,7 @@ use App\Creditos\Requests\CrearCreditoRequest;
 use App\Creditos\Requests\EditarCreditoRequest;
 use App\Creditos\Requests\ExportarCreditosRequest;
 use App\Creditos\Requests\ExportarEstadoCuentaRequest;
+use App\Creditos\Requests\PrevisualizarCreditoRequest;
 use App\Creditos\Services\CreditoService;
 use App\Creditos\Services\CuotaService;
 use App\Creditos\Services\EstadoCuentaService;
@@ -60,6 +61,11 @@ class CreditoController extends Controller
         $credito = $this->creditos->crearCredito($peticion->validated());
 
         return response()->json(['credito' => $credito], 201);
+    }
+
+    public function previsualizar(PrevisualizarCreditoRequest $peticion): JsonResponse
+    {
+        return response()->json($this->creditos->previsualizarCredito($peticion->validated()));
     }
 
     public function update(EditarCreditoRequest $peticion, Credito $credito): JsonResponse
