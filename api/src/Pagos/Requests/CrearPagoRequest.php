@@ -18,6 +18,7 @@ class CrearPagoRequest extends FormRequest
         return [
             'valor_pago' => ['required', 'numeric', 'min:0.01'],
             'forma_pago' => ['required', Rule::enum(FormaPago::class)],
+            'fecha_pago' => ['nullable', 'date', 'before_or_equal:today'],
             'observacion' => ['nullable', 'string', 'max:255'],
         ];
     }
