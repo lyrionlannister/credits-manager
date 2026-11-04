@@ -290,6 +290,9 @@ return [
         'fecha' => [
             'periodo_cerrado' => 'El período contable :mes/:anio está cerrado. No se pueden registrar movimientos.',
         ],
+        'fecha_pago' => [
+            'anterior_al_desembolso' => 'La fecha del pago no puede ser anterior a la fecha de desembolso del crédito.',
+        ],
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
         ],
