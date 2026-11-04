@@ -21,6 +21,7 @@ export const DatePicker: FC<DatePickerProps> = ({
     className = '',
     size = 'md',
     appendToBody = false,
+    maxDate,
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const instanceRef = useRef<flatpickr.Instance | null>(null);
@@ -39,6 +40,7 @@ export const DatePicker: FC<DatePickerProps> = ({
             monthSelectorType: 'static',
             dateFormat: mode === 'month' ? 'Y-m' : 'Y-m-d',
             defaultDate: value || undefined,
+            maxDate: maxDate || undefined,
             disableMobile: true,
             plugins: mode === 'month' ? [monthSelectPlugin({ shorthand: true, dateFormat: 'Y-m', altFormat: 'M Y' })] : [],
             onChange: (_dates, dateStr) => notificarCambio(dateStr),
@@ -49,7 +51,7 @@ export const DatePicker: FC<DatePickerProps> = ({
             instanceRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, appendToBody]);
+    }, [mode, appendToBody, maxDate]);
 
     useEffect(() => {
         if (instanceRef.current && (value ?? '') !== instanceRef.current.input.value) {

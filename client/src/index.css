@@ -834,3 +834,10 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+@media print {
+  /* El Modal fija `overflow: hidden` inline en el body mientras está abierto; sin este !important Chrome recorta la impresión a una página. */
+  body {
+    overflow: visible !important;
+  }
+}
