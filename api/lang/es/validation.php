@@ -331,6 +331,9 @@ return [
                 'invalido' => 'El dígito de verificación no corresponde al NIT.',
             ],
         ],
+        'archivo' => [
+            'extension_no_permitida' => 'Ese tipo de archivo no se puede adjuntar.',
+        ],
         'asesor_id' => [
             'mismo_asesor' => 'El cliente ya está asignado a ese asesor.',
         ],
