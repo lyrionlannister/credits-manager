@@ -13,13 +13,15 @@ import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Select } from '@ui/forms/components/select';
 import { Spinner } from '@ui/spinner/components/spinner';
-import { Save } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { formatMoney } from '../../shared/utils/format-money';
+import { CreditPreviewModal } from './credit-preview-modal';
 import { RefinancingBaseCard } from './refinancing-base-card';
 import { CREDIT_TYPE_OPTIONS } from '../constants/credit-type-options';
 import { PAYMENT_TYPE_OPTIONS } from '../constants/payment-type-options';
 import type { ApiCredit } from '../types/api-credit';
 import type { ApiCreditDetail } from '../types/api-credit-detail';
+import type { ApiCreditPreview } from '../types/api-credit-preview';
 import type { CreditType } from '../types/credit-type';
 import type { PaymentType } from '../types/payment-type';
 
@@ -54,7 +56,9 @@ export const CreateCreditForm: FC = () => {
     const [fechaDesembolso, setFechaDesembolso] = useState(HOY);
 
     const [error, setError] = useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [preview, setPreview] = useState<ApiCreditPreview | null>(null);
 
     const handleClienteSelect = (nuevoCliente: ApiClient | null) => {
         setCliente(nuevoCliente);
@@ -65,6 +69,19 @@ export const CreateCreditForm: FC = () => {
         setTipoCredito(value);
         setCreditoOrigenId(null);
     };
+
+    const buildPayload = () => ({
+        cliente_id: cliente?.id,
+        tipo_credito: tipoCredito,
+        credito_origen_id: tipoCredito === 'refinanciacion' ? creditoOrigenId : null,
+        // En una refinanciación el servidor calcula el préstamo: saldo de capital del original + valor adicional.
+        ...(tipoCredito === 'refinanciacion' ? { valor_adicional: valorPrestamo } : { valor_prestamo: valorPrestamo }),
+        tasa_interes: tasaInteres,
+        gastos_administracion_pct: gastosAdministracion,
+        plazo,
+        tipo_pago: tipoPago,
+        fecha_desembolso: fechaDesembolso,
+    });
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -80,23 +97,29 @@ export const CreateCreditForm: FC = () => {
             return;
         }
 
-        setIsSubmitting(true);
+        setIsPreviewing(true);
+
+        try {
+            const resultado = await sendRequest<ApiCreditPreview>('/creditos/previsualizar', {
+                method: 'POST',
+                body: buildPayload(),
+            });
+
+            setPreview(resultado);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
+        } finally {
+            setIsPreviewing(false);
+        }
+    };
+
+    const handleConfirmarCreacion = async () => {
+        setIsCreating(true);
 
         try {
             const response = await sendRequest<{ credito: ApiCredit }>('/creditos', {
                 method: 'POST',
-                body: {
-                    cliente_id: cliente.id,
-                    tipo_credito: tipoCredito,
-                    credito_origen_id: tipoCredito === 'refinanciacion' ? creditoOrigenId : null,
-                    // En una refinanciación el servidor calcula el préstamo: saldo de capital del original + valor adicional.
-                    ...(tipoCredito === 'refinanciacion' ? { valor_adicional: valorPrestamo } : { valor_prestamo: valorPrestamo }),
-                    tasa_interes: tasaInteres,
-                    gastos_administracion_pct: gastosAdministracion,
-                    plazo,
-                    tipo_pago: tipoPago,
-                    fecha_desembolso: fechaDesembolso,
-                },
+                body: buildPayload(),
             });
 
             navigate(`/creditos/${response.credito.id}`, {
@@ -104,15 +127,16 @@ export const CreateCreditForm: FC = () => {
                 state: { message: 'Crédito creado y cuotas generadas correctamente.' },
             });
         } catch (caught) {
+            setPreview(null);
             setError(caught instanceof Error ? caught.message : 'Ocurrió un error inesperado.');
         } finally {
-            setIsSubmitting(false);
+            setIsCreating(false);
         }
     };
 
     return (
         <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 print:hidden">
                 {error && (
                     <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 md:col-span-3 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
                         {error}
@@ -242,14 +266,29 @@ export const CreateCreditForm: FC = () => {
                 <div className="flex justify-end border-t border-gray-100 pt-6 md:col-span-3 dark:border-gray-800">
                     <Button
                         type="submit"
-                        disabled={isSubmitting}
-                        startIcon={isSubmitting ? <Spinner size="sm" color="white" /> : undefined}
-                        endIcon={isSubmitting ? undefined : <Save className="size-4" />}
+                        disabled={isPreviewing}
+                        startIcon={isPreviewing ? <Spinner size="sm" color="white" /> : undefined}
+                        endIcon={isPreviewing ? undefined : <Eye className="size-4" />}
                     >
-                        {isSubmitting ? 'Creando…' : 'Crear crédito y generar cuotas'}
+                        {isPreviewing ? 'Calculando…' : 'Previsualizar cuotas'}
                     </Button>
                 </div>
             </div>
+
+            {preview && cliente && (
+                <CreditPreviewModal
+                    preview={preview}
+                    cliente={cliente}
+                    creditoOrigenId={tipoCredito === 'refinanciacion' ? creditoOrigenId : null}
+                    tasaInteres={tasaInteres}
+                    plazo={Number(plazo)}
+                    tipoPago={tipoPago}
+                    fechaDesembolso={fechaDesembolso}
+                    isCreating={isCreating}
+                    onConfirm={handleConfirmarCreacion}
+                    onClose={() => setPreview(null)}
+                />
+            )}
         </form>
     );
 };
