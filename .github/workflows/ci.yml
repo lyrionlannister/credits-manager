@@ -223,7 +223,7 @@ jobs:
       - name: Namespace de ghcr.io
         run: echo "GHCR_NS=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # Una vez al día: evita que la capa `apk upgrade` de los Dockerfile reutilice el cache-from
       # de GH Actions de antes de que Alpine publicara el parche de un CVE nuevo (Trivy, abajo,
