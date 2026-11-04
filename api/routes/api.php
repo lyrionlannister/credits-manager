@@ -81,10 +81,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'usuarioActual']);
-    Route::patch('/me/clave', [AuthController::class, 'cambiarClave']);
+    Route::patch('/me/clave', [AuthController::class, 'cambiarClave'])->middleware('throttle:cambiar-clave-propia');
 
     Route::get('/empresas', [EmpresaAdminController::class, 'index'])->middleware('superadmin');
     Route::post('/empresas', [EmpresaAdminController::class, 'store'])->middleware('superadmin');
