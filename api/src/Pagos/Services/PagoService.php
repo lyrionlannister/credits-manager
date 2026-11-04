@@ -133,18 +133,18 @@ class PagoService
      * Aplica el pago a las cuotas pendientes/vencidas del crédito, de la más antigua a la más reciente. El
      * sobrante, si el pago excede lo adeudado, se descarta silenciosamente — no se guarda ni se abona a nada.
      */
-    public function registrarPago(Credito $credito, Dinero $valorPago, FormaPago $formaPago, ?string $observacion, ?int $usuarioId): array
+    public function registrarPago(Credito $credito, Dinero $valorPago, FormaPago $formaPago, ?string $observacion, ?int $usuarioId, ?string $fechaPago = null): array
     {
         $this->exigirDesembolsado($credito);
 
-        return DB::transaction(function () use ($credito, $valorPago, $formaPago, $observacion, $usuarioId) {
+        return DB::transaction(function () use ($credito, $valorPago, $formaPago, $observacion, $usuarioId, $fechaPago) {
             $creditoAnteriores = $this->auditoria->instantanea($credito);
 
             $pago = $this->pagos->crear([
                 'credito_id' => $credito->id,
                 'cliente_id' => $credito->cliente_id,
                 'valor_pago' => $valorPago,
-                'fecha_pago' => now(),
+                'fecha_pago' => $fechaPago !== null ? CarbonImmutable::parse($fechaPago, 'America/Bogota')->startOfDay() : now(),
                 'forma_pago' => $formaPago,
                 'observacion' => $observacion,
                 'registrado_por' => $usuarioId,
