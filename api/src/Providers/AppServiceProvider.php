@@ -68,5 +68,10 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(30)->by('ip:'.$peticion->ip()),
             ];
         });
+
+        // Acota la fuerza bruta de `clave_actual` por quien ya tiene una sesión (p. ej. una cookie robada sin la clave).
+        RateLimiter::for('cambiar-clave-propia', function (Request $peticion) {
+            return Limit::perMinute(5)->by($peticion->user()?->id ?? $peticion->ip());
+        });
     }
 }

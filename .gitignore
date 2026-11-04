@@ -16,3 +16,4 @@ graphify-out/
 CLAUDE.md
 .playwright-mcp/
 *.png
+.vscode/

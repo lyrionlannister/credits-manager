@@ -4,6 +4,7 @@ namespace App\Importacion\Services;
 
 use App\Auditoria\Enums\AccionAuditoria;
 use App\Auditoria\Services\EmisorAuditoria;
+use App\Exportacion\Services\ConvertidorValores;
 use App\Importacion\Constants\ImportacionConstants;
 use App\Importacion\Definiciones\DefinicionImportacion;
 use App\Importacion\Enums\EstadoImportacion;
@@ -33,6 +34,7 @@ class ImportacionService
         protected ImportacionErrorRepository $errores,
         protected ImportacionEjecutorService $ejecutor,
         protected EmisorAuditoria $auditoria,
+        protected ConvertidorValores $convertidor,
     ) {}
 
     /** Solo las cargas de las hojas que el usuario puede importar: sus filas y errores traen datos de ese módulo. */
@@ -250,11 +252,11 @@ class ImportacionService
 
             foreach ($this->errores->cursorDeImportacion($importacion->id) as $error) {
                 fputcsv($salida, [
-                    $error->fila ?? '',
-                    $error->columna ?? '',
+                    $this->convertidor->neutralizar((string) ($error->fila ?? '')),
+                    $this->convertidor->neutralizar((string) ($error->columna ?? '')),
                     $error->severidad->value === 'aviso' ? 'Aviso' : 'Error',
                     $error->fase->value === 'escritura' ? 'Escritura' : 'Validación',
-                    $error->motivo,
+                    $this->convertidor->neutralizar($error->motivo),
                 ], ';');
             }
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\Middleware\DebeCambiarClave;
 use App\Auth\Middleware\EsAdmin;
 use App\Auth\Middleware\EsSuperAdmin;
 use App\Auth\Middleware\TieneAlgunPermiso;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
 
         $middleware->alias([
+            'debe_cambiar_clave' => DebeCambiarClave::class,
             'admin' => EsAdmin::class,
             'superadmin' => EsSuperAdmin::class,
             'permiso' => TienePermiso::class,

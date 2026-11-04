@@ -81,10 +81,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'usuarioActual']);
-    Route::patch('/me/clave', [AuthController::class, 'cambiarClave']);
+    Route::patch('/me/clave', [AuthController::class, 'cambiarClave'])->middleware('throttle:cambiar-clave-propia');
 
     Route::get('/empresas', [EmpresaAdminController::class, 'index'])->middleware('superadmin');
     Route::post('/empresas', [EmpresaAdminController::class, 'store'])->middleware('superadmin');
@@ -354,7 +354,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{importacion}/cancelar', [ImportacionController::class, 'cancelar'])->whereNumber('importacion');
     });
 
-    Route::get('/terceros', [TerceroController::class, 'index']);
+    // El permiso exacto (clientes.listar vs terceros.listar) depende del `tipo` solicitado y se exige dentro del controlador; esto es solo defensa en profundidad.
+    Route::get('/terceros', [TerceroController::class, 'index'])->middleware('algun_permiso:clientes.listar,terceros.listar');
     Route::post('/terceros/personas-naturales', [TerceroController::class, 'storeNatural'])->middleware('permiso:terceros,crear');
     Route::post('/terceros/personas-juridicas', [TerceroController::class, 'storeJuridica'])->middleware('permiso:terceros,crear');
     Route::get('/terceros/{tercero}', [TerceroController::class, 'show'])->middleware('permiso:terceros,listar');

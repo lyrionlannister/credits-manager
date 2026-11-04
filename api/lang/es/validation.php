@@ -177,6 +177,9 @@ return [
                 'invalido' => 'El dígito de verificación no corresponde al NIT.',
             ],
         ],
+        'logo' => [
+            'svg_no_seguro' => 'El SVG contiene elementos no permitidos (script, referencias externas o manejadores de evento). Sube un logo sin esos elementos.',
+        ],
         'metas' => [
             'periodo_tipo_repetido' => 'Ya existe una meta de este tipo para el período.',
             'sin_meta' => 'No existe una meta de este tipo para el período.',
@@ -287,6 +290,9 @@ return [
         'fecha' => [
             'periodo_cerrado' => 'El período contable :mes/:anio está cerrado. No se pueden registrar movimientos.',
         ],
+        'fecha_pago' => [
+            'anterior_al_desembolso' => 'La fecha del pago no puede ser anterior a la fecha de desembolso del crédito.',
+        ],
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
         ],
@@ -324,6 +330,9 @@ return [
             'digito_verificacion' => [
                 'invalido' => 'El dígito de verificación no corresponde al NIT.',
             ],
+        ],
+        'archivo' => [
+            'extension_no_permitida' => 'Ese tipo de archivo no se puede adjuntar.',
         ],
         'asesor_id' => [
             'mismo_asesor' => 'El cliente ya está asignado a ese asesor.',
