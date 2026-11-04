@@ -110,6 +110,34 @@ class CreditoService
         });
     }
 
+    /** Mismo cálculo que `crearCredito`, sin tocar la base de datos: nada se persiste. */
+    public function previsualizarCredito(array $datos): array
+    {
+        [$valorPrestamo, $saldoTomado] = $this->valorDelPrestamo($datos);
+        $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? 0);
+
+        $plazo = (int) $datos['plazo'];
+        $resultado = AmortizacionCalculator::calcular(
+            $valorPrestamo,
+            (float) $datos['tasa_interes'],
+            $plazo,
+            TipoPago::from($datos['tipo_pago']),
+            $datos['fecha_desembolso'],
+        );
+
+        $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($valorPrestamo, $porcentajeGastos);
+
+        return [
+            'valor_prestamo' => $valorPrestamo,
+            'saldo_refinanciado' => $saldoTomado,
+            'valor_cuota' => $resultado['valor_cuota'],
+            'valor_total' => $resultado['valor_total'],
+            'valor_total_con_otros' => $resultado['valor_total']->sumar(Dinero::sumarVarios(...array_fill(0, $plazo, $otrosPorCuota))),
+            'interes_total' => $resultado['valor_total']->restar($valorPrestamo),
+            'cuotas' => $this->conValorTotalCuota($this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos)),
+        ];
+    }
+
     /**
      * Solo mientras el crédito no se ha desembolsado: aún no hay pagos ni comprobante contable, así que
      * cambiar las condiciones se resuelve regenerando el plan de cuotas. Pasado el desembolso, cualquier
@@ -218,6 +246,12 @@ class CreditoService
         $otrosGastos = OtrosGastosCalculator::valorPorCuota($capitalInicial, $porcentaje);
 
         return array_map(fn (array $cuota) => [...$cuota, 'valor_otros_gastos' => $otrosGastos], $cuotas);
+    }
+
+    /** Replica el accesor `valor_total_cuota` de `Cuota` para que la previsualización use las mismas columnas. */
+    private function conValorTotalCuota(array $cuotas): array
+    {
+        return array_map(fn (array $cuota) => [...$cuota, 'valor_total_cuota' => $cuota['valor']->sumar($cuota['valor_otros_gastos'])], $cuotas);
     }
 
     /**
