@@ -24,6 +24,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # El job reporta su estado vía la API de Actions (GET workflow-runs); sin esto
+      # falla con "Resource not accessible by integration" aun con upload: false.
+      actions: read
     strategy:
       fail-fast: false
       matrix:
