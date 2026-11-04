@@ -6,7 +6,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://'.env('SANCTUM_STATEFUL_DOMAINS', 'app.ddasolucionescredicias.tech')],
+    // Si la variable no está definida, cae a un dominio inválido (nunca a uno real de producción):
+    // el navegador rechazará el CORS por completo, en vez de aceptar silenciosamente el origen equivocado.
+    'allowed_origins' => ['https://'.env('SANCTUM_STATEFUL_DOMAINS', 'dominio-no-configurado.invalid')],
 
     'allowed_origins_patterns' => [],
 
