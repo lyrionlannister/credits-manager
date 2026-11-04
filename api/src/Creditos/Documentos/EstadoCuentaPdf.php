@@ -184,7 +184,7 @@ final class EstadoCuentaPdf implements DocumentoPdf
 
     public function camposEmpresa(): CamposEmpresaDocumento
     {
-        return new CamposEmpresaDocumento(direccion: false, telefono: false, ubicacion: false, correo: false);
+        return new CamposEmpresaDocumento(direccion: false, ubicacion: false);
     }
 
     /** Los pagos reversados siguen en el detalle para trazabilidad, pero no suman al total recaudado. */

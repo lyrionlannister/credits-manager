@@ -20,7 +20,7 @@
         .cabecera td { padding: 0; }
         .logo { max-width: 120pt; max-height: 58pt; }
         .empresa { text-align: center; font-size: 8pt; line-height: 1.35; }
-        .empresa .nombre { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; }
+        .empresa .nombre { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
         .caja-documento { border: 1px solid #9ca3af; text-align: center; padding: 12pt 6pt; }
         .caja-documento .titulo { font-size: 11pt; }
         .caja-documento .consecutivo { font-weight: bold; font-size: 9.5pt; margin-top: 3pt; }
@@ -84,12 +84,12 @@
 
     <table class="cabecera">
         <tr>
-            <td style="width: 30%;">
+            <td style="width: 26%;">
                 @if ($logo)
                     <img class="logo" src="{{ $logo }}" alt="{{ $empresa->nombre_empresa }}">
                 @endif
             </td>
-            <td style="width: 40%;" class="empresa">
+            <td style="width: 46%;" class="empresa">
                 @if ($campos->nombre)<div class="nombre">{{ $empresa->nombre_empresa }}</div>@endif
                 @if ($campos->nit && $empresa->nitConDigito())<div>NIT {{ $empresa->nitConDigito() }}</div>@endif
                 @if ($campos->direccion && $empresa->direccion)<div>{{ $empresa->direccion }}</div>@endif
@@ -97,7 +97,7 @@
                 @if ($campos->ubicacion && $ubicacion)<div>{{ $ubicacion }}</div>@endif
                 @if ($campos->correo && $empresa->correo)<div>{{ $empresa->correo }}</div>@endif
             </td>
-            <td style="width: 30%; padding-left: 14pt;">
+            <td style="width: 28%; padding-left: 10pt;">
                 <div class="caja-documento">
                     <div class="titulo">{{ $documento->titulo() }}</div>
                     @if ($documento->consecutivo())
