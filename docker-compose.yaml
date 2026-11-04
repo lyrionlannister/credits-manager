@@ -24,24 +24,29 @@ services:
   redis:
     image: docker.io/library/redis:7-alpine
     container_name: credits-manager-redis
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
     volumes:
       - redis_data:/data
+    environment:
+      TZ: America/Bogota
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
 
   phpmyadmin:
-    image: docker.io/phpmyadmin/phpmyadmin:latest
+    image: docker.io/phpmyadmin/phpmyadmin:5.2.2
     container_name: credits-manager-phpmyadmin
     environment:
       TZ: America/Bogota
       PMA_HOST: database
       PMA_PORT: 3306
       UPLOAD_LIMIT: 64M
+    ports:
+      - "127.0.0.1:8081:80"
     depends_on:
       database:
         condition: service_healthy
@@ -75,6 +80,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       BROADCAST_CONNECTION: reverb
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
@@ -209,6 +215,7 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       BROADCAST_CONNECTION: reverb
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
@@ -268,8 +275,6 @@ services:
       api:
         condition: service_healthy
       reverb:
-        condition: service_started
-      phpmyadmin:
         condition: service_started
     restart: unless-stopped
 
