@@ -137,8 +137,10 @@ class AuthControllerTest extends TestCase
         $usuario->update(['debe_cambiar_clave' => true]);
         $this->actingAs($usuario, 'sanctum');
 
+        $referer = 'https://'.collect(config('sanctum.stateful'))->first();
+
         $this->getJson('/api/v1/me')->assertStatus(200);
-        $this->postJson('/api/v1/logout')->assertStatus(204);
+        $this->withHeader('Referer', $referer)->postJson('/api/v1/logout')->assertStatus(204);
     }
 
     public function test_rechaza_cambio_de_clave_con_clave_actual_incorrecta(): void
