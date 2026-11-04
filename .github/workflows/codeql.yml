@@ -24,6 +24,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # El job reporta su estado vía la API de Actions (GET workflow-runs); sin esto
+      # falla con "Resource not accessible by integration" aun con upload: false.
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -40,7 +43,29 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
+      # upload: false — code scanning (pestaña Security) exige GitHub Advanced Security, que en
+      # repos privados es de pago. El análisis corre igual; el SARIF queda como artefacto del run
+      # en vez de subirse, y el paso siguiente falla el job si encuentra algo.
       - name: Analizar
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: "/language:${{ matrix.language }}"
+          upload: false
+          output: sarif-results
+
+      - name: Publicar resultados SARIF
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results
+          retention-days: 30
+
+      - name: Fallar si CodeQL encontró algo
+        run: |
+          total=$(jq '[.runs[].results[]] | length' sarif-results/*.sarif | awk '{s+=$1} END {print s+0}')
+          echo "Hallazgos de CodeQL: $total"
+          if [ "$total" -gt 0 ]; then
+            jq -r '.runs[].results[] | "- \(.ruleId): \(.message.text) (\(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine))"' sarif-results/*.sarif
+            exit 1
+          fi
