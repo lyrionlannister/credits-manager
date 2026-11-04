@@ -26,7 +26,9 @@ RUN pnpm run build
 
 FROM docker.io/library/nginx:alpine
 
-RUN apk upgrade --no-cache
+# Ver comentario sobre APK_CACHE_DATE en api/Dockerfile.
+ARG APK_CACHE_DATE=unset
+RUN echo "apk cache bust: ${APK_CACHE_DATE}" && apk upgrade --no-cache
 
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 COPY api/public /var/www/html/public
