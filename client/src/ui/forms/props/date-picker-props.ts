@@ -12,4 +12,6 @@ export type DatePickerProps = {
     size?: 'sm' | 'md';
     /** Ancla el calendario al `body` en vez de renderizarlo `static` junto al input: evita que quede recortado dentro de un contenedor con `overflow-x-auto` (p. ej. una celda de tabla). */
     appendToBody?: boolean;
+    /** Fecha máxima seleccionable, formato `Y-m-d`. */
+    maxDate?: string;
 };
