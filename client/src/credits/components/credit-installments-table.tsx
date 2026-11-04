@@ -7,7 +7,7 @@ import { INSTALLMENT_STATUS_CLASSES, INSTALLMENT_STATUS_LABEL } from '../constan
 import type { CreditInstallmentsTableProps } from '../props/credit-installments-table-props';
 
 export const CreditInstallmentsTable: FC<CreditInstallmentsTableProps> = ({ cuotas, saldoCapitalTeoricoPorCuota }) => (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 print:border-0 print:p-0 dark:border-gray-800 dark:bg-white/3">
         <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Cuotas</h2>
         <DataTable
             columns={[

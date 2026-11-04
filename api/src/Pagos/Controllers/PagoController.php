@@ -62,6 +62,7 @@ class PagoController extends Controller
             FormaPago::from($datos['forma_pago']),
             $datos['observacion'] ?? null,
             Auth::id(),
+            $datos['fecha_pago'] ?? null,
         );
 
         return response()->json([
