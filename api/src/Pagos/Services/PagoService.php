@@ -64,6 +64,33 @@ class PagoService
         );
     }
 
+    /**
+     * Fecha real en que se pagó cada cuota pagada: la del último pago vigente que le aplicó dinero o, si la cerró una
+     * liquidación (que no deja detalle por cuota), la de esa liquidación.
+     *
+     * @param  iterable<Cuota>  $cuotas
+     * @return array<int, string|null> cuota_id => `Y-m-d`
+     */
+    public function fechasDePagoPorCuota(int $creditoId, iterable $cuotas): array
+    {
+        $aplicado = $this->pagoDetalles->ultimoPagoVigentePorCuota($creditoId);
+        $liquidacion = $this->pagos->liquidacionVigente($creditoId)?->fecha_pago?->toDateString();
+        $fechas = [];
+
+        foreach ($cuotas as $cuota) {
+            $porDetalle = $aplicado[$cuota->id] ?? null;
+            $cubiertaPorDetalle = $porDetalle !== null && $porDetalle['total'] >= $cuota->valor_pagado->centavos();
+
+            $fechas[$cuota->id] = match (true) {
+                $cuota->estado !== EstadoCuota::Pagada => $porDetalle['fecha'] ?? null,
+                $cubiertaPorDetalle || $liquidacion === null => $porDetalle['fecha'] ?? null,
+                default => $liquidacion,
+            };
+        }
+
+        return $fechas;
+    }
+
     public function listarPorCredito(int $creditoId, string $direccion = 'desc'): Collection
     {
         return $this->pagos->porCredito($creditoId, $direccion);

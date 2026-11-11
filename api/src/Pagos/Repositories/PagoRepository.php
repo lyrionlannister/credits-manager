@@ -107,6 +107,17 @@ class PagoRepository extends BaseRepository
             ->first();
     }
 
+    /** Liquidación anticipada vigente: el único pago sin detalle por cuota. */
+    public function liquidacionVigente(int $creditoId): ?Pago
+    {
+        return $this->consulta()
+            ->where('credito_id', $creditoId)
+            ->whereDoesntHave('reversa')
+            ->whereDoesntHave('detalles')
+            ->orderByDesc('id')
+            ->first();
+    }
+
     /** Último pago aplicado al crédito que no está reversado: el único que admite reversa, para no reordenar la aplicación. */
     public function ultimoVigenteDelCredito(int $creditoId): ?Pago
     {

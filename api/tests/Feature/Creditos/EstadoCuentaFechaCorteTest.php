@@ -32,5 +32,27 @@ class EstadoCuentaFechaCorteTest extends TestCase
         $respuesta->assertOk();
         $respuesta->assertJsonPath('fecha_corte', now('America/Bogota')->toDateString());
         $respuesta->assertJsonPath('pagos.0.reversa.motivo', 'Pago registrado por error');
+        $respuesta->assertJsonPath('credito.cuotas.0.fecha_pago', null);
+    }
+
+    public function test_cada_cuota_muestra_la_fecha_real_en_que_se_pago_y_no_la_del_plan(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $credito = $this->crearCredito($this->crearCliente(), ['valor_prestamo' => 300, 'fecha_desembolso' => now()->subMonths(4)->toDateString()]);
+        foreach ([1, 2, 3] as $numero) {
+            $this->crearCuota($credito, ['numero_cuota' => $numero, 'fecha_vencimiento' => now()->subMonths(4 - $numero)->toDateString(), 'valor' => 100, 'valor_capital' => 100]);
+        }
+        $fechaReal = now('America/Bogota')->subDays(3)->toDateString();
+        app(PagoService::class)->registrarPago($credito->fresh(), Dinero::desdePesos(100), FormaPago::Efectivo, null, null, $fechaReal);
+        app(PagoService::class)->liquidarCredito($credito->fresh(), FormaPago::Efectivo, null, null);
+
+        $respuesta = $this->getJson("/api/v1/creditos/{$credito->id}/estado-cuenta")->assertOk();
+
+        $respuesta->assertJsonPath('credito.cuotas.0.fecha_pago', $fechaReal);
+        $respuesta->assertJsonPath('credito.cuotas.1.fecha_pago', now('America/Bogota')->toDateString());
+        $respuesta->assertJsonPath('credito.cuotas.2.fecha_pago', now('America/Bogota')->toDateString());
+
+        $this->get("/api/v1/creditos/{$credito->id}/estado-cuenta/pdf")->assertOk();
     }
 }

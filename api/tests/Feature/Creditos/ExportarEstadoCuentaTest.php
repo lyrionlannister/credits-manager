@@ -138,9 +138,11 @@ class ExportarEstadoCuentaTest extends TestCase
         $this->assertCount(4, $datos, 'encabezado, dos cuotas y el total');
         $this->assertEquals(1, $datos[1][0]);
         $this->assertEquals(2, $datos[2][0]);
-        $this->assertSame('Total', $datos[3][7]);
-        $this->assertEquals(600, $datos[3][4]);
-        $this->assertEquals(300, $datos[3][5]);
+        // La columna 2 es la fecha real de pago, después del vencimiento.
+        $this->assertSame('Fecha de pago', $datos[0][2]);
+        $this->assertSame('Total', $datos[3][8]);
+        $this->assertEquals(600, $datos[3][5]);
+        $this->assertEquals(300, $datos[3][6]);
     }
 
     public function test_la_fuente_no_lee_un_credito_de_otra_empresa_aunque_no_haya_sesion(): void

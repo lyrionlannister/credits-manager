@@ -43,6 +43,10 @@ class EstadoCuentaService
     {
         $credito = $this->creditos->mostrarCredito($credito);
 
+        // La fecha real del pago de cada cuota viaja como atributo de la cuota: la pantalla y el PDF la muestran junto al vencimiento.
+        $fechasPago = $this->pagos->fechasDePagoPorCuota($credito->id, $credito->cuotas);
+        $credito->cuotas->each(fn ($cuota) => $cuota->setAttribute('fecha_pago', $fechasPago[$cuota->id] ?? null));
+
         // La fecha de corte es el día en que se genera: el estado de cuenta refleja los movimientos hasta ese momento.
         return [
             'credito' => $credito,

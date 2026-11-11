@@ -16,4 +16,6 @@ export type ApiInstallment = {
     saldo_capital: string;
     valor_pagado: string;
     estado: InstallmentStatus;
+    /** Fecha real del último pago aplicado (`Y-m-d`). Solo la trae `GET /creditos/{id}/estado-cuenta`. */
+    fecha_pago?: string | null;
 };

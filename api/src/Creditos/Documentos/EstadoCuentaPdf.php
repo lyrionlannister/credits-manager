@@ -17,6 +17,7 @@ use App\Impresion\Enums\OrientacionDocumento;
 use App\Impresion\Enums\TipoColumnaDocumento;
 use App\Impresion\Services\FormateadorDocumento;
 use App\Pagos\Models\Pago;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -85,11 +86,12 @@ final class EstadoCuentaPdf implements DocumentoPdf
     {
         return [
             new ColumnaDocumento('numero', '#', TipoColumnaDocumento::Entero, 4),
-            new ColumnaDocumento('vencimiento', 'Vencimiento', TipoColumnaDocumento::Fecha, 13),
-            new ColumnaDocumento('capital', 'Capital', TipoColumnaDocumento::Monetario, 14),
-            new ColumnaDocumento('intereses', 'Intereses', TipoColumnaDocumento::Monetario, 14),
-            new ColumnaDocumento('total', 'Total de la cuota', TipoColumnaDocumento::Monetario, 16),
-            new ColumnaDocumento('saldo_capital', 'Saldo capital', TipoColumnaDocumento::Monetario, 15),
+            new ColumnaDocumento('vencimiento', 'Vencimiento', TipoColumnaDocumento::Fecha, 11),
+            new ColumnaDocumento('fecha_pago', 'Fecha de pago', TipoColumnaDocumento::Fecha, 11),
+            new ColumnaDocumento('capital', 'Capital', TipoColumnaDocumento::Monetario, 12),
+            new ColumnaDocumento('intereses', 'Intereses', TipoColumnaDocumento::Monetario, 12),
+            new ColumnaDocumento('total', 'Total de la cuota', TipoColumnaDocumento::Monetario, 14),
+            new ColumnaDocumento('saldo_capital', 'Saldo capital', TipoColumnaDocumento::Monetario, 13),
             new ColumnaDocumento('estado', 'Estado', TipoColumnaDocumento::Texto, 10),
         ];
     }
@@ -100,6 +102,7 @@ final class EstadoCuentaPdf implements DocumentoPdf
             yield [
                 'numero' => $cuota->numero_cuota,
                 'vencimiento' => $cuota->fecha_vencimiento,
+                'fecha_pago' => $cuota->fecha_pago !== null ? CarbonImmutable::parse($cuota->fecha_pago) : null,
                 'capital' => $cuota->valor_capital,
                 'intereses' => $cuota->valor_interes,
                 'total' => $cuota->valor_total_cuota,
