@@ -27,6 +27,14 @@ export const AuthProvider: FC<WithChildrenProps> = ({ children }) => {
         refreshUser().finally(() => setIsLoading(false));
     }, [refreshUser]);
 
+    // Fase 3: al volver a la ventana se vuelve a pedir /me (sin caché en el backend), para que
+    // un permiso asignado por un administrador aparezca sin recargar la página.
+    useEffect(() => {
+        window.addEventListener('focus', refreshUser);
+
+        return () => window.removeEventListener('focus', refreshUser);
+    }, [refreshUser]);
+
     useEffect(() => {
         const handleSessionExpired = () => {
             clearSessionCookies();

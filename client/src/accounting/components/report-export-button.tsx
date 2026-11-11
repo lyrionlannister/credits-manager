@@ -10,7 +10,8 @@ import type { ReportExportButtonProps } from '../props/report-export-button-prop
 
 /**
  * Exportación de un reporte contable. Excel y CSV requieren el permiso de exportar de ese informe
- * (`informes_contables.exportar_<informe>`); el PDF, `informes_contables.imprimir`. Sin ninguno no se muestra el botón.
+ * (`informes_contables.exportar_<informe>`); el PDF, `informes_contables.imprimir`. Sin ninguno se
+ * muestra qué permiso falta en vez de ocultar el botón sin más (Fase 7).
  */
 export const ReportExportButton: FC<ReportExportButtonProps> = ({ endpoint, exportPermissions, pdfEndpoint, pdfFilename, filters, disabled = false }) => {
     const { user } = useAuth();
@@ -20,7 +21,11 @@ export const ReportExportButton: FC<ReportExportButtonProps> = ({ endpoint, expo
     const [error, setError] = useState<string | null>(null);
 
     if (!canExport && !canPrint) {
-        return null;
+        return (
+            <p className="text-right text-sm text-gray-500 dark:text-gray-400">
+                {`Para exportar este informe necesitas el permiso ${exportPermissions.join(' o ')} (y para el PDF, informes_contables.imprimir). Pídeselo a un administrador.`}
+            </p>
+        );
     }
 
     return (

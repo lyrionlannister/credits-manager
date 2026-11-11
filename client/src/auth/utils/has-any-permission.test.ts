@@ -11,6 +11,7 @@ const lector: User = {
     permissions: [{ modulo: 'facturacion', accion: 'listar_notas_credito' }],
     isSuperAdmin: false,
     mustChangePassword: false,
+    permissionVersion: 1,
 };
 
 describe('hasAnyPermission', () => {

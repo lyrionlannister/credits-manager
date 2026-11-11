@@ -17,5 +17,9 @@ export type ApiPermisoPanelItem = ApiPermisoCatalogItem & {
 export type ApiPermisoExcepcion = ApiPermisoCatalogItem & {
     pivot: {
         concedido: boolean;
+        empresa_id: number;
+        motivo: string | null;
+        responsable_id: number | null;
+        vence_en: string | null;
     };
 };

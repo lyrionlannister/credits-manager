@@ -15,4 +15,5 @@ export type User = {
     permissions: ModulePermission[];
     isSuperAdmin: boolean;
     mustChangePassword: boolean;
+    permissionVersion: number;
 };
