@@ -38,6 +38,8 @@ class AuditoriaConstants
 
     public const MODULO_CORREO = 'correo';
 
+    public const MODULO_SOPORTE = 'soporte';
+
     /** Tope de ids que un evento masivo (p. ej. mora) lista de forma explícita; el conteo siempre va completo. */
     public const MAXIMO_IDS_EN_EVENTO = 200;
 

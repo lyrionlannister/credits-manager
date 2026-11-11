@@ -2,7 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Auditoria\Constants\AuditoriaConstants;
+use App\Auditoria\Enums\AccionAuditoria;
+use App\Auditoria\Services\EmisorAuditoria;
 use App\Usuarios\Models\Permiso;
+use App\Usuarios\Models\Usuario;
+use App\Usuarios\Services\PermisoCache;
 use Illuminate\Database\Seeder;
 
 /**
@@ -88,6 +93,31 @@ class PermisoSeeder extends Seeder
 
                 $vigentes[] = $permiso->id;
             }
+        }
+
+        // Fase 10: el retiro de un permiso del catálogo también queda en la bitácora, con su clave.
+        $retirados = Permiso::query()->whereKeyNot($vigentes)->get();
+
+        foreach ($retirados as $retirado) {
+            app(EmisorAuditoria::class)->registrar(
+                AccionAuditoria::CambioPermisos,
+                AuditoriaConstants::MODULO_USUARIOS,
+                "Permiso {$retirado->modulo}.{$retirado->accion} retirado del catálogo",
+                'permiso',
+                (int) $retirado->id,
+                ["{$retirado->modulo}.{$retirado->accion}" => true],
+                [],
+                'Retiro del catálogo de permisos',
+            );
+
+            // Fase 9: el permiso retirado deja de calcularse en el próximo cómputo, pero el
+            // caché guardado seguiría concediéndolo hasta su TTL; se invalida a los usuarios
+            // de los roles que lo tenían.
+            $cache = app(PermisoCache::class);
+            Usuario::query()
+                ->whereIn('rol_id', $retirado->roles()->pluck('roles.id'))
+                ->get(['id', 'empresa_id', 'version_permisos'])
+                ->each(fn (Usuario $usuario) => $cache->invalidar($usuario));
         }
 
         Permiso::query()->whereKeyNot($vigentes)->delete();

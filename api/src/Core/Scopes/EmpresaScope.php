@@ -2,6 +2,7 @@
 
 namespace App\Core\Scopes;
 
+use App\Soporte\Services\AccesoSoporteService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -40,7 +41,21 @@ class EmpresaScope implements Scope
                 return;
             }
 
-            $consulta->where($modelo->getTable().'.empresa_id', Auth::user()->empresa_id);
+            $usuario = Auth::user();
+
+            // Fase 4: el superadmin con acceso de soporte activo ve solo esa empresa, en lectura.
+            // Solo atributos crudos: ni el accesor `es_superadmin` ni la relación `rol` se pueden
+            // leer aquí — ambos vuelven a disparar este scope mientras se está evaluando.
+            // La base garantiza sin empresa ⇔ rol Super Admin (ver Usuario::esSuperadmin).
+            $esSuperadmin = $usuario->empresa_id === null;
+
+            if ($esSuperadmin) {
+                $acceso = app(AccesoSoporteService::class)->accesoActivo($usuario);
+
+                $consulta->where($modelo->getTable().'.empresa_id', $acceso?->empresa_id);
+            } else {
+                $consulta->where($modelo->getTable().'.empresa_id', $usuario->empresa_id);
+            }
         } finally {
             self::$resolviendoUsuarioAutenticado = false;
         }

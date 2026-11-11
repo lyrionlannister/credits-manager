@@ -3,6 +3,7 @@
 namespace App\Exportacion\Middleware;
 
 use App\Exportacion\Services\AccesoExportaciones;
+use App\Soporte\Services\AccesoSoporteService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,10 +20,22 @@ class PuedeExportar
     {
         $usuario = $peticion->user();
 
+        // Fase 4: el acceso de soporte no exporta, aunque la lectura esté permitida.
+        if ($usuario !== null && $usuario->es_superadmin
+            && app(AccesoSoporteService::class)->accesoActivo($usuario) !== null) {
+            return response()->json([
+                'message' => 'El acceso de soporte no permite exportar.',
+                'motivo_denegacion' => 'acceso_soporte_sin_exportar',
+            ], 403);
+        }
+
         $autorizado = $usuario !== null && collect($reportes)->contains(fn (string $reporte) => $this->acceso->puede($usuario, $reporte));
 
         if (! $autorizado) {
-            abort(403, 'No tienes permiso para realizar esta acción.');
+            return response()->json([
+                'message' => 'No tienes permiso para realizar esta acción.',
+                'motivo_denegacion' => 'sin_permiso_exportar',
+            ], 403);
         }
 
         return $siguiente($peticion);

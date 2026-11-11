@@ -24,6 +24,7 @@ class TareaProgramadaConstants
         'metas:evaluar' => '23:55',
         'obligaciones_tributarias:evaluar-alertas' => '06:00',
         'contabilidad:devengar-intereses' => '02:00',
+        'permisos:vencer-excepciones' => '02:30',
     ];
 
     /** El respaldo automático nunca se pausa desde la UI. */

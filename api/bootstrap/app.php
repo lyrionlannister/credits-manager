@@ -3,6 +3,7 @@
 use App\Auth\Middleware\DebeCambiarClave;
 use App\Auth\Middleware\EsAdmin;
 use App\Auth\Middleware\EsSuperAdmin;
+use App\Auth\Middleware\SoloLecturaSoporte;
 use App\Auth\Middleware\TieneAlgunPermiso;
 use App\Auth\Middleware\TienePermiso;
 use App\Auth\Middleware\TienePermisoOSuperAdmin;
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permiso_o_superadmin' => TienePermisoOSuperAdmin::class,
             'acceso_metas' => AccesoMetas::class,
             'exportacion' => PuedeExportar::class,
+            'soporte.solo_lectura' => SoloLecturaSoporte::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
