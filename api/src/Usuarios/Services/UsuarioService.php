@@ -22,6 +22,7 @@ class UsuarioService
         protected RolRepository $roles,
         protected PermisoRepository $permisos,
         protected EmisorAuditoria $auditoria,
+        protected PermisoCache $cachePermisos,
     ) {}
 
     public function listarUsuarios(?string $busqueda, string $columna, string $direccion, int $porPagina, int $pagina): LengthAwarePaginator
@@ -53,6 +54,11 @@ class UsuarioService
             ]);
 
             $this->usuarios->sincronizarPermisosExtra($usuario, $this->mapaPermisosExtra($datos));
+            // El modelo recién creado no trae `version_permisos` en memoria: sin refrescar,
+            // increment() partiría de null y dejaría 1 en la respuesta aunque en base sea 2.
+            $usuario->refresh();
+            $usuario->increment('version_permisos');
+            $this->cachePermisos->invalidar($usuario->fresh());
 
             $this->auditoria->registrarCreacion(AuditoriaConstants::MODULO_USUARIOS, "Usuario {$usuario->usuario} creado", $usuario, ['permisos_extra' => $this->permisosExtraDe($usuario)]);
 
@@ -94,6 +100,12 @@ class UsuarioService
                 );
             }
 
+            // La versión sube después de auditar: si se incrementara antes, `version_permisos`
+            // aparecería como campo cambiado en el evento de modificación y un edit sin cambios
+            // dejaría evento aunque nada cambió.
+            $usuario->increment('version_permisos');
+            $this->cachePermisos->invalidar($usuario->fresh());
+
             return $usuario;
         });
     }
@@ -108,11 +120,22 @@ class UsuarioService
         return array_key_exists('es_asesor_global', $datos) ? ['es_asesor_global' => $datos['es_asesor_global']] : [];
     }
 
+    /**
+     * Excepciones individuales: motivo obligatorio, responsable quien las crea y vencimiento
+     * por defecto a 30 días (máximo 90, validado en el request).
+     *
+     * @return array<int, array{concedido: bool, empresa_id: int|null, motivo: string, responsable_id: int|null, vence_en: string}>
+     */
     private function mapaPermisosExtra(array $datos): array
     {
         return collect($datos['permisos_extra'] ?? [])
             ->mapWithKeys(fn (array $excepcion) => [
-                $excepcion['permiso_id'] => ['concedido' => $excepcion['concedido']],
+                $excepcion['permiso_id'] => [
+                    'concedido' => $excepcion['concedido'],
+                    'motivo' => $excepcion['motivo'],
+                    'responsable_id' => Auth::id(),
+                    'vence_en' => $excepcion['vence_en'] ?? now()->addDays(30)->toDateTimeString(),
+                ],
             ])
             ->all();
     }
@@ -120,7 +143,7 @@ class UsuarioService
     /** @return array<string, bool> "modulo.accion" => concedido, ordenado para poder comparar antes/después */
     private function permisosExtraDe(Usuario $usuario): array
     {
-        $permisos = $usuario->permisosExtra()->get()
+        $permisos = $usuario->permisosExtraVigentes()->get()
             ->mapWithKeys(fn ($permiso) => ["{$permiso->modulo}.{$permiso->accion}" => (bool) $permiso->pivot->concedido])
             ->all();
 
@@ -187,7 +210,7 @@ class UsuarioService
             ? collect()
             : $this->roles->buscarPorIdOFallar($rolId)->permisos;
 
-        $yaConcedidos = $objetivo?->permisosExtra()->wherePivot('concedido', true)->pluck('permisos.id')->map(fn ($id) => (int) $id)->all() ?? [];
+        $yaConcedidos = $objetivo?->permisosExtraVigentes()->wherePivot('concedido', true)->pluck('permisos.id')->map(fn ($id) => (int) $id)->all() ?? [];
         $extrasNuevos = collect($permisosExtra)
             ->filter(fn (array $excepcion, int|string $permisoId) => $excepcion['concedido'] && ! in_array((int) $permisoId, $yaConcedidos, true))
             ->keys();
@@ -197,8 +220,43 @@ class UsuarioService
         $concedeLoQueNoTiene = $permisosQueSuma->contains(fn ($permiso) => ! $actor->tienePermiso($permiso->modulo, $permiso->accion));
 
         if ($tocaAdmin || $concedeLoQueNoTiene) {
+            // Fase 1 y Fase 10: el intento rechazado también queda en la bitácora, con el permiso que faltaba.
+            // No hay cambio que revertir (nada se guardó), así que se registra como intento rechazado.
+            $this->auditoria->registrar(
+                AccionAuditoria::Rechazar,
+                AuditoriaConstants::MODULO_USUARIOS,
+                'Asignación de permisos rechazada por el freno anti-escalada',
+                'usuario',
+                $objetivo?->id,
+                ['permisos_efectivos' => $objetivo !== null ? $this->permisosEfectivosDe($objetivo) : []],
+                ['permisos_que_intentaba_conceder' => $permisosQueSuma->map(fn ($permiso) => "{$permiso->modulo}.{$permiso->accion}")->sort()->values()->all()],
+                'No puedes conceder permisos que no tienes ni modificar a un administrador.',
+            );
+
             abort(403, 'No puedes conceder permisos que no tienes ni modificar a un administrador.');
         }
+    }
+
+    /** @return list<string> permisos efectivos "modulo.accion" del usuario en su empresa, ordenados */
+    private function permisosEfectivosDe(Usuario $usuario): array
+    {
+        $efectivos = $usuario->rol?->permisos()->get()
+            ->map(fn ($permiso) => "{$permiso->modulo}.{$permiso->accion}")
+            ->all() ?? [];
+
+        foreach ($usuario->permisosExtraVigentes()->get() as $permiso) {
+            $clave = "{$permiso->modulo}.{$permiso->accion}";
+
+            if ($permiso->pivot->concedido) {
+                $efectivos[] = $clave;
+            } else {
+                $efectivos = array_values(array_diff($efectivos, [$clave]));
+            }
+        }
+
+        sort($efectivos);
+
+        return array_values(array_unique($efectivos));
     }
 
     /**
