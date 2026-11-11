@@ -297,6 +297,11 @@ return [
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
         ],
+        'liquidacion' => [
+            'mayor_al_total' => 'El valor de la liquidación no puede ser mayor que el total calculado (:total).',
+            'descuento_sobre_capital' => 'El descuento solo puede salir de los intereses: el valor mínimo es :minimo.',
+            'motivo_requerido' => 'Indica el motivo del descuento.',
+        ],
         'valor_pago' => [
             'excede_saldo' => 'El pago supera lo que se debe del crédito. El máximo que se puede recibir es :maximo.',
         ],

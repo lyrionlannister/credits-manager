@@ -95,6 +95,8 @@ class PagoController extends Controller
             $datos['observacion'] ?? null,
             Auth::id(),
             $datos['fecha_pago'] ?? null,
+            isset($datos['valor_pago']) ? Dinero::desdePesos($datos['valor_pago']) : null,
+            $datos['motivo_descuento'] ?? null,
         );
 
         return response()->json($resultado, 201);

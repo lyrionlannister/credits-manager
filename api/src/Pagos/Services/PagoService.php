@@ -293,38 +293,57 @@ class PagoService
         ];
     }
 
-    public function liquidarCredito(Credito $credito, FormaPago $formaPago, ?string $observacion, ?int $usuarioId, ?string $fechaPago = null): array
-    {
-        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId, $fechaPago) {
+    /**
+     * `$valorAcordado` menor al total cotizado es un descuento: sale solo de los intereses (nunca del capital ni de los
+     * otros gastos), exige motivo y el comprobante se contabiliza con el interés ya descontado, así que cuadra.
+     */
+    public function liquidarCredito(
+        Credito $credito,
+        FormaPago $formaPago,
+        ?string $observacion,
+        ?int $usuarioId,
+        ?string $fechaPago = null,
+        ?Dinero $valorAcordado = null,
+        ?string $motivoDescuento = null,
+    ): array {
+        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId, $fechaPago, $valorAcordado, $motivoDescuento) {
             $creditoAnteriores = $this->auditoria->instantanea($credito);
             $cotizacion = $this->calcularLiquidacion($credito, $fechaPago);
+            $descuento = $this->descuentoDeLiquidacion($cotizacion, $valorAcordado, $motivoDescuento);
+            $interesCobrado = $cotizacion['interes']->restar($descuento);
+            $valorPago = $cotizacion['total']->restar($descuento);
 
             $pago = $this->pagos->crear([
                 'credito_id' => $credito->id,
                 'cliente_id' => $credito->cliente_id,
-                'valor_pago' => $cotizacion['total'],
+                'valor_pago' => $valorPago,
                 'valor_capital' => $cotizacion['capital_pendiente'],
-                'valor_interes' => $cotizacion['interes'],
+                'valor_interes' => $interesCobrado,
                 'valor_otros_gastos' => $cotizacion['otros_gastos'],
                 'fecha_pago' => $fechaPago !== null ? CarbonImmutable::parse($fechaPago, 'America/Bogota')->startOfDay() : now(),
                 'forma_pago' => $formaPago,
-                'observacion' => $observacion ?? 'Liquidación anticipada del crédito',
+                'observacion' => $observacion ?? ($descuento->esPositivo()
+                    ? "Liquidación anticipada con descuento de intereses de {$descuento->aDecimalString()}: {$motivoDescuento}"
+                    : 'Liquidación anticipada del crédito'),
                 'registrado_por' => $usuarioId,
             ]);
 
             $this->cuotas->cerrarPendientesComoOrigen($credito->id);
             $this->recalcularSaldoCapital($credito);
             $this->creditos->marcarComoPagado($credito);
-            $comprobante = $this->comprobantes->contabilizarRecaudoPago($pago, $cotizacion['capital_pendiente'], $cotizacion['interes'], $cotizacion['otros_gastos'], $credito->cliente->tercero_id);
+            $comprobante = $this->comprobantes->contabilizarRecaudoPago($pago, $cotizacion['capital_pendiente'], $interesCobrado, $cotizacion['otros_gastos'], $credito->cliente->tercero_id);
             $recibo = $this->recibos->emitir($pago, $comprobante);
 
             $this->auditoria->registrarCreacion(
                 AuditoriaConstants::MODULO_PAGOS,
-                "Liquidación anticipada del crédito #{$credito->id}: pago #{$pago->id} de {$cotizacion['total']->aDecimalString()}",
+                "Liquidación anticipada del crédito #{$credito->id}: pago #{$pago->id} de {$valorPago->aDecimalString()}",
                 $pago,
                 [
                     'capital' => $cotizacion['capital_pendiente'],
-                    'interes' => $cotizacion['interes'],
+                    'interes' => $interesCobrado,
+                    'interes_calculado' => $cotizacion['interes'],
+                    'descuento_interes' => $descuento,
+                    'motivo_descuento' => $descuento->esPositivo() ? $motivoDescuento : null,
                     'comprobante_id' => $comprobante?->id,
                     'recibo' => $recibo->numero,
                 ],
@@ -336,8 +355,31 @@ class PagoService
                 $creditoAnteriores,
             );
 
-            return ['pago' => $pago, ...$cotizacion];
+            return ['pago' => $pago, ...$cotizacion, 'descuento' => $descuento];
         });
+    }
+
+    private function descuentoDeLiquidacion(array $cotizacion, ?Dinero $valorAcordado, ?string $motivo): Dinero
+    {
+        if ($valorAcordado === null || $valorAcordado->igualA($cotizacion['total'])) {
+            return Dinero::cero();
+        }
+
+        if ($valorAcordado->mayorOIgualQue($cotizacion['total'])) {
+            throw ValidationException::withMessages(['valor_pago' => __('validation.custom.liquidacion.mayor_al_total', ['total' => $cotizacion['total']->aDecimalString()])]);
+        }
+
+        $descuento = $cotizacion['total']->restar($valorAcordado);
+        if ($descuento->mayorOIgualQue($cotizacion['interes']->sumar(Dinero::desdeCentavos(1)))) {
+            $minimo = $cotizacion['capital_pendiente']->sumar($cotizacion['otros_gastos']);
+            throw ValidationException::withMessages(['valor_pago' => __('validation.custom.liquidacion.descuento_sobre_capital', ['minimo' => $minimo->aDecimalString()])]);
+        }
+
+        if (trim((string) $motivo) === '') {
+            throw ValidationException::withMessages(['motivo_descuento' => __('validation.custom.liquidacion.motivo_requerido')]);
+        }
+
+        return $descuento;
     }
 
     /**
