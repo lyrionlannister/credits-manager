@@ -69,10 +69,13 @@ describe('ReportExportButton', () => {
         expect(screen.getByText('formatos: ninguno; pdf: sí')).toBeTruthy();
     });
 
-    it('sin exportar ni imprimir no se muestra', () => {
+    it('sin exportar ni imprimir indica qué permiso falta', () => {
         mocks.permisos = new Set(['informes_contables.exportar_libro_diario']);
         renderBoton(['informes_contables.exportar_libro_mayor']);
 
         expect(screen.queryByText(/formatos/)).toBeNull();
+        expect(
+            screen.getByText(/Para exportar este informe necesitas el permiso informes_contables\.exportar_libro_mayor/),
+        ).toBeTruthy();
     });
 });
