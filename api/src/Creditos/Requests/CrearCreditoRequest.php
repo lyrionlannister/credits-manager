@@ -49,6 +49,7 @@ class CrearCreditoRequest extends FormRequest
             'plazo' => ['required', 'integer', 'min:1'],
             'tipo_pago' => ['required', Rule::enum(TipoPago::class)],
             'fecha_desembolso' => ['required', 'date'],
+            'fecha_primer_vencimiento' => ['nullable', 'date_format:Y-m-d', 'after:fecha_desembolso'],
         ];
     }
 

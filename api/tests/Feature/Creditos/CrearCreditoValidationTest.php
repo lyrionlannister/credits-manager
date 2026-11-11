@@ -5,6 +5,7 @@ namespace Tests\Feature\Creditos;
 use App\Creditos\Enums\TipoCredito;
 use App\Creditos\Enums\TipoPago;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\CreatesCreditFixtures;
 use Tests\TestCase;
@@ -65,6 +66,37 @@ class CrearCreditoValidationTest extends TestCase
         }
 
         $this->assertDatabaseCount('creditos', 0);
+    }
+
+    public function test_rechaza_primer_vencimiento_no_posterior_al_desembolso(): void
+    {
+        $this->actingAsAdmin();
+        $cliente = $this->crearCliente();
+
+        foreach (['2026-01-01', '2025-12-20', '16/01/2026'] as $fecha) {
+            $this->postJson('/api/v1/creditos', [...$this->payloadValido($cliente->id), 'fecha_primer_vencimiento' => $fecha])
+                ->assertStatus(422)->assertJsonValidationErrors('fecha_primer_vencimiento');
+        }
+
+        $this->assertDatabaseCount('creditos', 0);
+    }
+
+    public function test_con_primer_vencimiento_la_primera_cuota_cobra_interes_por_dias(): void
+    {
+        $this->actingAsAdmin();
+        $cliente = $this->crearCliente();
+
+        $respuesta = $this->postJson('/api/v1/creditos', [
+            ...$this->payloadValido($cliente->id),
+            'valor_prestamo' => 1000,
+            'tasa_interes' => 10,
+            'plazo' => 3,
+            'fecha_primer_vencimiento' => '2026-01-16',
+        ])->assertStatus(201);
+
+        $primera = DB::table('cuotas')->where('credito_id', $respuesta->json('credito.id') ?? $respuesta->json('id'))->orderBy('numero_cuota')->first();
+        $this->assertSame('2026-01-16', $primera->fecha_vencimiento);
+        $this->assertSame(5000, (int) $primera->valor_interes);
     }
 
     public function test_rechaza_tasa_de_interes_negativa(): void

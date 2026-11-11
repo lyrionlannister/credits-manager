@@ -467,6 +467,7 @@ return [
         'plazo' => 'plazo',
         'tipo_pago' => 'tipo de pago',
         'fecha_desembolso' => 'fecha de desembolso',
+        'fecha_primer_vencimiento' => 'fecha del primer vencimiento',
 
         // Pagos
         'valor_pago' => 'valor del pago',

@@ -4,7 +4,7 @@ namespace App\Creditos\Services;
 
 use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\TipoPago;
-use DateTime;
+use Carbon\CarbonImmutable;
 
 /**
  * Sistema francés (cuota fija, interés compuesto sobre saldo insoluto). Cálculo puro,
@@ -17,6 +17,10 @@ use DateTime;
  * en que un número se convierte en "la cuota", "el interés del período" o "el capital
  * del período" se redondea una única vez a centavo vía `Dinero`, nunca se acumula
  * error de flotante en sumas/restas posteriores (esas son aritmética entera exacta).
+ *
+ * Diferencias deliberadas con el legado: el mes se suma sin desbordar (un desembolso del 31 de enero vence el 28 de
+ * febrero, no el 3 de marzo) y, si se da la fecha del primer vencimiento, el interés de la primera cuota se prorratea
+ * por los días reales desde el desembolso; el capital de cada cuota no cambia.
  */
 class AmortizacionCalculator
 {
@@ -26,6 +30,7 @@ class AmortizacionCalculator
         int $plazo,
         TipoPago $tipoPago,
         string $fechaDesembolso,
+        ?string $fechaPrimerVencimiento = null,
     ): array {
         $i = $tasaInteres / 100;
 
@@ -36,30 +41,39 @@ class AmortizacionCalculator
             $valorCuota = $valorPrestamo->dividirEntre($plazo);
         }
 
-        $fechaBase = new DateTime($fechaDesembolso);
+        $desembolso = CarbonImmutable::parse($fechaDesembolso)->startOfDay();
+        $primerVencimiento = $fechaPrimerVencimiento !== null ? CarbonImmutable::parse($fechaPrimerVencimiento)->startOfDay() : null;
+
+        // El vencimiento de siempre no se prorratea: un mes de 31 días no debe cobrar 31/30 del interés.
+        if ($primerVencimiento?->equalTo(self::sumarPeriodos($desembolso, 1, $tipoPago))) {
+            $primerVencimiento = null;
+        }
         $saldo = $valorPrestamo;
         $valorTotal = Dinero::cero();
         $cuotas = [];
 
         for ($n = 1; $n <= $plazo; $n++) {
-            $fechaCuota = clone $fechaBase;
-
-            if ($tipoPago === TipoPago::Mensual) {
-                $fechaCuota->modify("+{$n} month");
-            } else {
-                $dias = $n * 15;
-                $fechaCuota->modify("+{$dias} day");
-            }
+            $fechaCuota = $primerVencimiento !== null
+                ? self::sumarPeriodos($primerVencimiento, $n - 1, $tipoPago)
+                : self::sumarPeriodos($desembolso, $n, $tipoPago);
 
             $interesPeriodo = $saldo->multiplicarPorTasa($i);
+            $interesCobrado = $interesPeriodo;
+
+            if ($n === 1 && $primerVencimiento !== null) {
+                $dias = (int) $desembolso->diffInDays($primerVencimiento);
+                $interesCobrado = $saldo->multiplicarPorTasa($i * $dias / $tipoPago->diasPorPeriodo());
+            }
 
             if ($n === $plazo) {
                 $capitalPeriodo = $saldo;
-                $valorEstaCuota = $capitalPeriodo->sumar($interesPeriodo);
+                $valorEstaCuota = $capitalPeriodo->sumar($interesCobrado);
             } else {
                 $capitalPeriodo = $valorCuota->restar($interesPeriodo);
-                $valorEstaCuota = $valorCuota;
+                $valorEstaCuota = $capitalPeriodo->sumar($interesCobrado);
             }
+
+            $interesPeriodo = $interesCobrado;
 
             $saldo = $saldo->restar($capitalPeriodo);
             $valorTotal = $valorTotal->sumar($valorEstaCuota);
@@ -79,5 +93,12 @@ class AmortizacionCalculator
             'valor_total' => $valorTotal,
             'cuotas' => $cuotas,
         ];
+    }
+
+    public static function sumarPeriodos(CarbonImmutable $fecha, int $periodos, TipoPago $tipoPago): CarbonImmutable
+    {
+        return $tipoPago === TipoPago::Mensual
+            ? $fecha->addMonthsNoOverflow($periodos)
+            : $fecha->addDays($periodos * $tipoPago->diasPorPeriodo());
     }
 }

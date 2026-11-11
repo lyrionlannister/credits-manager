@@ -30,6 +30,7 @@ export const EditCreditForm: FC<EditCreditFormProps> = ({ credito }) => {
     const [plazo, setPlazo] = useState(String(credito.plazo));
     const [tipoPago, setTipoPago] = useState<PaymentType>(credito.tipo_pago);
     const [fechaDesembolso, setFechaDesembolso] = useState(credito.fecha_desembolso);
+    const [fechaPrimerVencimiento, setFechaPrimerVencimiento] = useState(credito.cuotas?.[0]?.fecha_vencimiento ?? '');
     const [motivo, setMotivo] = useState('');
 
     const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export const EditCreditForm: FC<EditCreditFormProps> = ({ credito }) => {
                     plazo,
                     tipo_pago: tipoPago,
                     fecha_desembolso: fechaDesembolso,
+                    fecha_primer_vencimiento: fechaPrimerVencimiento || null,
                     motivo,
                 },
             });
@@ -141,6 +143,16 @@ export const EditCreditForm: FC<EditCreditFormProps> = ({ credito }) => {
                 <div>
                     <Label htmlFor="fecha-desembolso">Fecha de desembolso</Label>
                     <DatePicker id="fecha-desembolso" name="fecha-desembolso" required value={fechaDesembolso} onChange={setFechaDesembolso} />
+                </div>
+
+                <div>
+                    <Label htmlFor="fecha-primer-vencimiento">Primer vencimiento (opcional)</Label>
+                    <DatePicker
+                        id="fecha-primer-vencimiento"
+                        name="fecha-primer-vencimiento"
+                        value={fechaPrimerVencimiento}
+                        onChange={setFechaPrimerVencimiento}
+                    />
                 </div>
 
                 <div className="md:col-span-3">

@@ -90,6 +90,7 @@ class CreditoService
                 (int) $datos['plazo'],
                 TipoPago::from($datos['tipo_pago']),
                 $datos['fecha_desembolso'],
+                $datos['fecha_primer_vencimiento'] ?? null,
             );
 
             $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos));
@@ -123,6 +124,7 @@ class CreditoService
             $plazo,
             TipoPago::from($datos['tipo_pago']),
             $datos['fecha_desembolso'],
+            $datos['fecha_primer_vencimiento'] ?? null,
         );
 
         $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($valorPrestamo, $porcentajeGastos);
@@ -171,6 +173,7 @@ class CreditoService
                 (int) $datos['plazo'],
                 TipoPago::from($datos['tipo_pago']),
                 $datos['fecha_desembolso'],
+                $datos['fecha_primer_vencimiento'] ?? null,
             );
 
             $this->cuotas->eliminarTodasDeCredito($credito->id);
