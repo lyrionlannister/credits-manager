@@ -6,23 +6,21 @@ import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
 import { PageSkeleton } from '@ui/skeleton/components/page-skeleton';
 import type { ApiCreditDetail } from '../../credits/types/api-credit-detail';
 import { SettleCreditForm } from '../components/settle-credit-form';
-import type { ApiSettlementQuote } from '../types/api-settlement-quote';
 
 export const SettleCreditPage: FC = () => {
     const { id } = useParams<{ id: string }>();
 
     const { data: detalle, error: loadError } = useResource<ApiCreditDetail>(`/creditos/${id}`);
-    const { data: cotizacion, error: quoteError } = useResource<ApiSettlementQuote>(`/creditos/${id}/liquidacion`);
 
-    if (loadError || quoteError) {
+    if (loadError) {
         return (
             <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
-                {loadError ?? quoteError}
+                {loadError}
             </div>
         );
     }
 
-    if (!detalle || !cotizacion) {
+    if (!detalle) {
         return <PageSkeleton />;
     }
 
@@ -33,7 +31,7 @@ export const SettleCreditPage: FC = () => {
             <PageBreadcrumb pageTitle={`Liquidar crédito — ${credito.cliente?.tercero.nombre ?? '—'}`} />
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8 dark:border-gray-800 dark:bg-white/3">
-                <SettleCreditForm credito={credito} cotizacion={cotizacion} />
+                <SettleCreditForm credito={credito} />
             </div>
         </div>
     );
