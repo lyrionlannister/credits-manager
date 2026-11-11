@@ -8,6 +8,7 @@ use App\Exportacion\Enums\FormatoExportacion;
 use App\Http\Controllers\Controller;
 use App\Pagos\Enums\FormaPago;
 use App\Pagos\Models\Pago;
+use App\Pagos\Requests\CotizarLiquidacionRequest;
 use App\Pagos\Requests\CrearPagoRequest;
 use App\Pagos\Requests\ExportarPagosRequest;
 use App\Pagos\Requests\LiquidarCreditoRequest;
@@ -78,9 +79,9 @@ class PagoController extends Controller
         return response()->json(['reversa' => $reversa]);
     }
 
-    public function liquidacion(Credito $credito): JsonResponse
+    public function liquidacion(CotizarLiquidacionRequest $peticion, Credito $credito): JsonResponse
     {
-        return response()->json($this->pagoService->calcularLiquidacion($credito));
+        return response()->json($this->pagoService->calcularLiquidacion($credito, $peticion->validated('fecha_pago')));
     }
 
     public function liquidar(LiquidarCreditoRequest $peticion, Credito $credito): JsonResponse
@@ -92,6 +93,7 @@ class PagoController extends Controller
             FormaPago::from($datos['forma_pago']),
             $datos['observacion'] ?? null,
             Auth::id(),
+            $datos['fecha_pago'] ?? null,
         );
 
         return response()->json($resultado, 201);

@@ -57,6 +57,29 @@ class AislamientoEntreEmpresasPagosTest extends TestCase
         $this->assertEquals($pagadoAntes, $credito->cuotas()->firstOrFail()->valor_pagado->aFloat());
     }
 
+    public function test_otra_empresa_no_cotiza_ni_liquida_un_credito_ajeno_con_fecha_de_pago(): void
+    {
+        [$credito] = $this->pagoDeEmpresaA();
+        $fechaPago = now('America/Bogota')->toDateString();
+
+        $this->actingAsAdmin();
+
+        $this->getJson("/api/v1/creditos/{$credito->id}/liquidacion?fecha_pago={$fechaPago}")->assertStatus(404);
+        $this->postJson("/api/v1/creditos/{$credito->id}/liquidacion", ['forma_pago' => 'efectivo', 'fecha_pago' => $fechaPago])->assertStatus(404);
+        $this->assertDatabaseCount('pagos', 1);
+    }
+
+    public function test_otra_empresa_no_reversa_una_liquidacion_ajena(): void
+    {
+        [$credito] = $this->pagoDeEmpresaA();
+        $liquidacion = app(PagoService::class)->liquidarCredito($credito->fresh(), FormaPago::Efectivo, null, null)['pago'];
+
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/pagos/{$liquidacion->id}/reversar", ['motivo' => 'Intento de reversa ajena'])->assertStatus(404);
+        $this->assertDatabaseMissing('reversas_pago', ['pago_id' => $liquidacion->id]);
+    }
+
     public function test_otra_empresa_no_ve_el_estado_de_cuenta_ajeno(): void
     {
         [$credito] = $this->pagoDeEmpresaA();

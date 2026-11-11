@@ -10,6 +10,7 @@ use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\EstadoCuota;
 use App\Creditos\Models\Credito;
+use App\Creditos\Models\Cuota;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Services\OtrosGastosCalculator;
@@ -27,6 +28,7 @@ use App\Pagos\Repositories\ReversaPagoRepository;
 use App\Recibos\Services\ReciboCajaService;
 use App\Usuarios\Models\Usuario;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -79,7 +81,9 @@ class PagoService
             $this->exigirReversible($credito, $pago);
 
             $creditoAnteriores = $this->auditoria->instantanea($credito);
-            $cuotasAfectadas = $this->restaurarCuotas($credito, $pago);
+            $cuotasAfectadas = $pago->detalles()->exists()
+                ? $this->restaurarCuotas($credito, $pago)
+                : $this->restaurarCuotasDeLiquidacion($credito, $pago);
 
             $this->recalcularSaldoCapital($credito);
 
@@ -202,15 +206,24 @@ class PagoService
      * pagado nada) — los días transcurridos ya incluyen cualquier atraso, así que la
      * mora queda cubierta sin contarla dos veces. Pendiente de confirmar con el
      * cliente; ver alternativa híbrida comentada más abajo.
+     *
+     * `$fechaPago` permite registrar una liquidación que el cliente pagó antes de que se capturara: los días se
+     * cuentan hasta esa fecha y no hasta hoy.
      */
-    public function calcularLiquidacion(Credito $credito): array
+    public function calcularLiquidacion(Credito $credito, ?string $fechaPago = null): array
     {
         $this->exigirDesembolsado($credito);
 
         $capitalPendiente = $this->capitalPendienteReal($credito);
 
         $fechaReferencia = $this->pagos->ultimoPago($credito->id)?->fecha_pago ?? $credito->fecha_desembolso;
-        $diasTranscurridos = (int) $fechaReferencia->diffInDays(now());
+        $fechaCorte = $fechaPago !== null ? CarbonImmutable::parse($fechaPago, 'America/Bogota')->startOfDay() : now();
+
+        if ($fechaCorte->lt($fechaReferencia->copy()->startOfDay())) {
+            throw ValidationException::withMessages(['fecha_pago' => __('validation.custom.fecha_pago.anterior_a_la_referencia')]);
+        }
+
+        $diasTranscurridos = (int) $fechaReferencia->diffInDays($fechaCorte);
 
         $divisorPeriodo = $credito->tipo_pago->diasPorPeriodo();
         $tasaDiaria = ((float) $credito->tasa_interes / 100) / $divisorPeriodo;
@@ -254,14 +267,15 @@ class PagoService
             'otros_gastos' => $otrosGastos,
             'total' => $total,
             'fecha_referencia' => $fechaReferencia->toDateString(),
+            'fecha_pago' => $fechaCorte->toDateString(),
         ];
     }
 
-    public function liquidarCredito(Credito $credito, FormaPago $formaPago, ?string $observacion, ?int $usuarioId): array
+    public function liquidarCredito(Credito $credito, FormaPago $formaPago, ?string $observacion, ?int $usuarioId, ?string $fechaPago = null): array
     {
-        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId) {
+        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId, $fechaPago) {
             $creditoAnteriores = $this->auditoria->instantanea($credito);
-            $cotizacion = $this->calcularLiquidacion($credito);
+            $cotizacion = $this->calcularLiquidacion($credito, $fechaPago);
 
             $pago = $this->pagos->crear([
                 'credito_id' => $credito->id,
@@ -270,7 +284,7 @@ class PagoService
                 'valor_capital' => $cotizacion['capital_pendiente'],
                 'valor_interes' => $cotizacion['interes'],
                 'valor_otros_gastos' => $cotizacion['otros_gastos'],
-                'fecha_pago' => now(),
+                'fecha_pago' => $fechaPago !== null ? CarbonImmutable::parse($fechaPago, 'America/Bogota')->startOfDay() : now(),
                 'forma_pago' => $formaPago,
                 'observacion' => $observacion ?? 'Liquidación anticipada del crédito',
                 'registrado_por' => $usuarioId,
@@ -486,11 +500,6 @@ class PagoService
             throw ValidationException::withMessages(['pago' => __('validation.custom.reversa.no_es_ultimo')]);
         }
 
-        // Una liquidación anticipada cierra cuotas sin detalle por cuota: no hay a qué devolverle el dinero, así que no se reversa.
-        if (! $pago->detalles()->exists()) {
-            throw ValidationException::withMessages(['pago' => __('validation.custom.reversa.sin_aplicacion')]);
-        }
-
         // Si el interés de alguna cuota de este pago ya se facturó ("Facturar intereses pagados"), reversar el
         // pago sin deshacer esa factura dejaría una cuota "sin pagar" con una factura de su interés ya emitida.
         if ($this->documentosFacturacion->existeInteresFacturadoParaPagoDetalle($pago->detalles()->pluck('id')->all())) {
@@ -513,19 +522,48 @@ class PagoService
         foreach ($pago->detalles()->get() as $detalle) {
             $cuota = $cuotas[$detalle->cuota_id];
             $pagado = $cuota->valor_pagado->restar($detalle->valor_aplicado)->noNegativo();
-            $total = $cuota->valor->sumar($cuota->valor_otros_gastos);
 
-            $estado = match (true) {
-                $pagado->mayorOIgualQue($total) => EstadoCuota::Pagada,
-                $cuota->fecha_vencimiento->lt($hoy) => EstadoCuota::Vencida,
-                default => EstadoCuota::Pendiente,
-            };
-
-            $this->cuotas->actualizar($cuota, ['valor_pagado' => $pagado, 'estado' => $estado]);
+            $this->cuotas->actualizar($cuota, ['valor_pagado' => $pagado, 'estado' => $this->estadoSegunPagado($cuota, $pagado, $hoy)]);
             $afectadas[] = $cuota->id;
         }
 
         return $afectadas;
+    }
+
+    /**
+     * Una liquidación cierra las cuotas sin dejar detalle por cuota, así que no hay qué restarle a cada una: lo que
+     * cada cuota tenía antes se reconstruye con lo que le aplicaron los demás pagos vigentes del crédito.
+     *
+     * @return list<int> ids de las cuotas afectadas
+     */
+    private function restaurarCuotasDeLiquidacion(Credito $credito, Pago $pago): array
+    {
+        $aplicadoPorCuota = $this->pagoDetalles->sumaVigentePorCuota($credito->id, $pago->id);
+        $hoy = now('America/Bogota')->startOfDay();
+        $afectadas = [];
+
+        foreach ($this->cuotas->todasOrdenadasParaActualizar($credito->id) as $cuota) {
+            $pagado = Dinero::desdeCentavos($aplicadoPorCuota[$cuota->id] ?? 0);
+
+            if ($pagado->igualA($cuota->valor_pagado)) {
+                continue;
+            }
+
+            $this->cuotas->actualizar($cuota, ['valor_pagado' => $pagado, 'estado' => $this->estadoSegunPagado($cuota, $pagado, $hoy)]);
+            $afectadas[] = $cuota->id;
+        }
+
+        return $afectadas;
+    }
+
+    /** El estado vuelve a Pendiente o Vencida según la fecha, no a «la del pago»: la mora es consecuencia del vencimiento. */
+    private function estadoSegunPagado(Cuota $cuota, Dinero $pagado, CarbonInterface $hoy): EstadoCuota
+    {
+        return match (true) {
+            $pagado->mayorOIgualQue($cuota->valor->sumar($cuota->valor_otros_gastos)) => EstadoCuota::Pagada,
+            $cuota->fecha_vencimiento->lt($hoy) => EstadoCuota::Vencida,
+            default => EstadoCuota::Pendiente,
+        };
     }
 
     private function exigirDesembolsado(Credito $credito): void

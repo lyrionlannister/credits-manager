@@ -76,6 +76,60 @@ class LiquidacionCreditoTest extends TestCase
         $this->assertEquals(now()->subDays(10)->toDateString(), $cotizacion['fecha_referencia']);
     }
 
+    public function test_con_fecha_de_pago_cuenta_los_dias_hasta_esa_fecha_y_no_hasta_hoy(): void
+    {
+        $cliente = $this->crearCliente();
+        $credito = $this->crearCredito($cliente, [
+            'valor_prestamo' => 1_000_000,
+            'tasa_interes' => 2,
+            'tipo_pago' => TipoPago::Mensual,
+            'fecha_desembolso' => now('America/Bogota')->subDays(45)->toDateString(),
+        ]);
+        $this->crearCuota($credito, ['numero_cuota' => 1, 'valor' => 20000, 'valor_interes' => 20000, 'valor_capital' => 0]);
+        $fechaPago = now('America/Bogota')->subDays(15)->toDateString();
+
+        $cotizacion = app(PagoService::class)->calcularLiquidacion($credito->fresh(), $fechaPago);
+
+        $this->assertEquals(30, $cotizacion['dias_transcurridos']);
+        $this->assertSame('20000.00', $cotizacion['interes']->aDecimalString());
+        $this->assertSame($fechaPago, $cotizacion['fecha_pago']);
+    }
+
+    public function test_liquidar_con_fecha_de_pago_guarda_el_pago_con_esa_fecha(): void
+    {
+        $this->crearReglasDeCreditoYPago();
+        $cliente = $this->crearCliente();
+        $credito = $this->crearCredito($cliente, ['valor_prestamo' => 900, 'tasa_interes' => 0, 'fecha_desembolso' => now()->subMonths(2)->toDateString()]);
+        $this->crearCuota($credito, ['numero_cuota' => 1, 'fecha_vencimiento' => now()->addMonth()->toDateString()]);
+        $fechaPago = now('America/Bogota')->subDays(10)->toDateString();
+
+        $resultado = app(PagoService::class)->liquidarCredito($credito->fresh(), FormaPago::Transferencia, null, null, $fechaPago);
+
+        $this->assertEquals($fechaPago, $resultado['pago']->fresh()->fecha_pago->toDateString());
+        $this->assertSame(EstadoCredito::Pagado, $credito->fresh()->estado);
+    }
+
+    public function test_rechaza_una_fecha_de_pago_anterior_al_ultimo_pago_vigente(): void
+    {
+        $cliente = $this->crearCliente();
+        $credito = $this->crearCredito($cliente, ['fecha_desembolso' => now()->subDays(60)->toDateString()]);
+        $this->crearCuota($credito, ['numero_cuota' => 1]);
+        Pago::create([
+            'credito_id' => $credito->id,
+            'cliente_id' => $cliente->id,
+            'valor_pago' => 100,
+            'fecha_pago' => now()->subDays(10),
+            'forma_pago' => FormaPago::Efectivo,
+        ]);
+
+        try {
+            app(PagoService::class)->calcularLiquidacion($credito->fresh(), now()->subDays(20)->toDateString());
+            $this->fail('Debió rechazar la fecha anterior al último pago.');
+        } catch (ValidationException $excepcion) {
+            $this->assertArrayHasKey('fecha_pago', $excepcion->errors());
+        }
+    }
+
     public function test_liquidar_credito_cierra_todas_las_cuotas_y_marca_el_credito_como_pagado(): void
     {
         $this->crearReglasDeCreditoYPago();
