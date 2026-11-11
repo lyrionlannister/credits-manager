@@ -19,6 +19,9 @@ use App\ObligacionesTributarias\Commands\EvaluarAlertasObligacionesCommand;
 use App\Redis\Contracts\RedisClienteInterface;
 use App\Redis\Services\RedisCliente;
 use App\Respaldos\Commands\EjecutarRespaldoCommand;
+use App\Soporte\Commands\ExpirarAccesosSoporteCommand;
+use App\Usuarios\Commands\EscucharPermisosCommand;
+use App\Usuarios\Commands\VencerExcepcionesCommand;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Events\ScheduledTaskFailed;
@@ -51,7 +54,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->commands([EscucharAuditoriaCommand::class, EstadoAuditoriaCommand::class, LimpiarExportacionesCommand::class, LimpiarImportacionesCommand::class, EvaluarMetasCommand::class, EjecutarRespaldoCommand::class, EvaluarAlertasObligacionesCommand::class, PublicarMonitoreoCommand::class, DevengarInteresesCommand::class, RasterizarLogosPendientesCommand::class, AlinearCuotasQuincenalesCommand::class]);
+        $this->commands([EscucharAuditoriaCommand::class, EstadoAuditoriaCommand::class, LimpiarExportacionesCommand::class, LimpiarImportacionesCommand::class, EvaluarMetasCommand::class, EjecutarRespaldoCommand::class, EvaluarAlertasObligacionesCommand::class, PublicarMonitoreoCommand::class, DevengarInteresesCommand::class, RasterizarLogosPendientesCommand::class, AlinearCuotasQuincenalesCommand::class, VencerExcepcionesCommand::class, EscucharPermisosCommand::class, ExpirarAccesosSoporteCommand::class]);
 
         Event::listen(Looping::class, [LatidoTrabajadores::class, 'enEspera']);
         Event::listen(JobProcessing::class, [LatidoTrabajadores::class, 'alEmpezar']);

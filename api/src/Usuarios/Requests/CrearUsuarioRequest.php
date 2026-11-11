@@ -32,6 +32,9 @@ class CrearUsuarioRequest extends FormRequest
             'permisos_extra' => ['sometimes', 'array'],
             'permisos_extra.*.permiso_id' => ['required', 'integer', Rule::in($this->idsPermisosValidos())],
             'permisos_extra.*.concedido' => ['required', 'boolean'],
+            // Excepciones temporales (Fase 2): motivo obligatorio; vencimiento opcional, por defecto 30 días y máximo 90.
+            'permisos_extra.*.motivo' => ['required', 'string', 'max:500'],
+            'permisos_extra.*.vence_en' => ['nullable', 'date', 'after:now', 'before_or_equal:' . now()->addDays(90)->toDateTimeString()],
         ];
     }
 
