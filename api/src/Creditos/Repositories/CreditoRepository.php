@@ -50,7 +50,8 @@ class CreditoRepository extends BaseRepository
             ->with('cliente.tercero')
             ->withCount(['cuotas as cuotas_vencidas' => fn ($q) => $q->where('estado', EstadoCuota::Vencida)])
             ->withCount('pagos')
-            ->orderByDesc('creado_en');
+            ->orderByDesc('creado_en')
+            ->orderByDesc('id');
 
         return $this->filtrar($consulta, $busqueda, $clienteId, $estado)->paginate(perPage: $porPagina, page: $pagina);
     }
@@ -88,7 +89,8 @@ class CreditoRepository extends BaseRepository
     {
         $consulta = $this->restringirAAsesor($this->consultaDeEmpresa($empresaId), $empresaId, $asesorId)
             ->with('cliente.tercero')
-            ->orderByDesc('creado_en');
+            ->orderByDesc('creado_en')
+            ->orderByDesc('id');
 
         return $this->filtrar($consulta, $busqueda, null, $estado);
     }

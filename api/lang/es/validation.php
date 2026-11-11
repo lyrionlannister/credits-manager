@@ -242,7 +242,6 @@ return [
             'estado_credito' => 'Solo se pueden reversar pagos de créditos desembolsados o pagados.',
             'ya_reversado' => 'Este pago ya fue reversado.',
             'no_es_ultimo' => 'Solo se puede reversar el último pago aplicado del crédito. Reversa primero los pagos posteriores.',
-            'sin_aplicacion' => 'Este pago no tiene cuotas aplicadas (por ejemplo, una liquidación anticipada) y no se puede reversar automáticamente.',
             'interes_ya_facturado' => 'El interés de alguna cuota de este pago ya se facturó. Anula esa factura antes de reversar el pago.',
         ],
         'credito_origen_id' => [
@@ -292,6 +291,7 @@ return [
         ],
         'fecha_pago' => [
             'anterior_al_desembolso' => 'La fecha del pago no puede ser anterior a la fecha de desembolso del crédito.',
+            'anterior_a_la_referencia' => 'La fecha del pago no puede ser anterior al último pago vigente ni al desembolso del crédito.',
         ],
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',

@@ -2,8 +2,10 @@ import type { FC, SubmitEvent } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
+import { DatePicker } from '@ui/forms/components/date-picker';
 import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Select } from '@ui/forms/components/select';
@@ -12,16 +14,21 @@ import { Save } from 'lucide-react';
 import { SettlementQuoteCard } from './settlement-quote-card';
 import { PAYMENT_METHOD_OPTIONS } from '../constants/payment-method-options';
 import type { SettleCreditFormProps } from '../props/settle-credit-form-props';
+import type { ApiSettlementQuote } from '../types/api-settlement-quote';
 import type { PaymentMethod } from '../types/payment-method';
 
-export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito, cotizacion }) => {
+export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito }) => {
     const navigate = useNavigate();
     const { sendRequest } = useSendRequest();
 
     const [formaPago, setFormaPago] = useState<PaymentMethod>('efectivo');
+    const [fechaPago, setFechaPago] = useState('');
     const [observacion, setObservacion] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const quoteEndpoint = `/creditos/${credito.id}/liquidacion${fechaPago ? `?fecha_pago=${fechaPago}` : ''}`;
+    const { data: cotizacion, error: quoteError } = useResource<ApiSettlementQuote>(quoteEndpoint);
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -31,7 +38,7 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito, cotizacio
         try {
             await sendRequest(`/creditos/${credito.id}/liquidacion`, {
                 method: 'POST',
-                body: { forma_pago: formaPago, observacion: observacion || null },
+                body: { forma_pago: formaPago, fecha_pago: fechaPago || null, observacion: observacion || null },
             });
 
             navigate(`/pagos/creditos/${credito.id}`, { replace: true, state: { message: 'Crédito liquidado correctamente.' } });
@@ -44,13 +51,21 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito, cotizacio
 
     return (
         <>
-            <SettlementQuoteCard cotizacion={cotizacion} />
+            {cotizacion ? (
+                <SettlementQuoteCard cotizacion={cotizacion} />
+            ) : (
+                !quoteError && (
+                    <div className="mb-6 flex justify-center rounded-xl border border-gray-100 bg-gray-50 p-5 dark:border-gray-800 dark:bg-white/5">
+                        <Spinner size="sm" />
+                    </div>
+                )
+            )}
 
             <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    {error && (
+                    {(error ?? quoteError) && (
                         <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 sm:col-span-2 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
-                            {error}
+                            {error ?? quoteError}
                         </div>
                     )}
 
@@ -65,6 +80,17 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito, cotizacio
                     </div>
 
                     <div>
+                        <Label htmlFor="fecha-pago">Fecha de pago (opcional)</Label>
+                        <DatePicker
+                            id="fecha-pago"
+                            name="fecha-pago"
+                            value={fechaPago}
+                            onChange={setFechaPago}
+                            maxDate={new Date().toISOString().slice(0, 10)}
+                        />
+                    </div>
+
+                    <div className="sm:col-span-2">
                         <Label htmlFor="observacion">Observación (opcional)</Label>
                         <Input
                             id="observacion"
@@ -75,13 +101,14 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito, cotizacio
                     </div>
 
                     <p className="text-sm text-gray-500 sm:col-span-2 dark:text-gray-400">
-                        Esta acción cierra el crédito por completo: todas las cuotas quedan pagadas y no se puede deshacer.
+                        Si el cliente pagó antes de hoy, elige la fecha real del pago: el interés se calcula hasta ese día.
+                        Esta acción cierra el crédito por completo: todas las cuotas quedan pagadas.
                     </p>
 
-                    <div className="flex gap-3 border-t border-gray-100 pt-6 sm:col-span-2 dark:border-gray-800">
+                    <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6 sm:col-span-2 dark:border-gray-800">
                         <Button
                             type="submit"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || !cotizacion}
                             startIcon={isSubmitting ? <Spinner size="sm" color="white" /> : undefined}
                             endIcon={isSubmitting ? undefined : <Save className="size-4" />}
                         >

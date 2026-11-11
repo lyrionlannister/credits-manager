@@ -213,16 +213,71 @@ class ReversarPagoTest extends TestCase
         $this->assertDatabaseCount('reversas_pago', 1);
     }
 
-    public function test_una_liquidacion_sin_cuotas_aplicadas_no_se_reversa(): void
+    public function test_reversar_una_liquidacion_devuelve_cada_cuota_a_lo_que_le_aplicaron_los_demas_pagos(): void
+    {
+        $this->actingAsAdmin();
+        $this->configurarReglas();
+        $credito = $this->creditoConTresCuotas();
+        $this->pagar($credito, 150);
+        $liquidacion = app(PagoService::class)->liquidarCredito($credito->fresh(), FormaPago::Efectivo, null, null)['pago'];
+
+        $this->assertEquals(EstadoCredito::Pagado, $credito->fresh()->estado);
+
+        $this->postJson($this->urlReversa($liquidacion), ['motivo' => self::MOTIVO])->assertOk();
+
+        $esperado = [1 => [100, EstadoCuota::Pagada], 2 => [50, EstadoCuota::Pendiente], 3 => [0, EstadoCuota::Pendiente]];
+        foreach ($esperado as $numero => [$pagado, $estado]) {
+            $cuota = $credito->cuotas()->where('numero_cuota', $numero)->firstOrFail();
+            $this->assertEquals($pagado, $cuota->valor_pagado->aFloat(), "cuota {$numero}");
+            $this->assertEquals($estado, $cuota->estado, "estado de la cuota {$numero}");
+        }
+
+        $this->assertEquals(EstadoCredito::Desembolsado, $credito->fresh()->estado);
+        $this->assertDatabaseHas('reversas_pago', ['pago_id' => $liquidacion->id, 'motivo' => self::MOTIVO]);
+        $this->assertEquals('anulado', $liquidacion->recibo()->firstOrFail()->estado->value);
+
+        $original = Comprobante::where('modulo_origen', 'pagos')->where('origen_id', $liquidacion->id)->firstOrFail();
+        $this->assertEquals('anulado', $original->estado->value);
+        $this->assertNotNull($original->comprobante_reverso_id);
+    }
+
+    public function test_reversar_una_liquidacion_sin_pagos_previos_deja_todas_las_cuotas_en_cero(): void
     {
         $this->actingAsAdmin();
         $this->crearReglasDeCreditoYPago();
         $credito = $this->creditoConTresCuotas();
         $liquidacion = app(PagoService::class)->liquidarCredito($credito, FormaPago::Efectivo, null, null)['pago'];
 
-        $this->postJson($this->urlReversa($liquidacion), ['motivo' => self::MOTIVO])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['pago']);
+        $this->postJson($this->urlReversa($liquidacion), ['motivo' => self::MOTIVO])->assertOk();
+
+        $this->assertEquals(0, $credito->cuotas()->sum('valor_pagado'));
+        $this->assertEquals(0, $credito->cuotas()->where('estado', EstadoCuota::Pagada)->count());
+        $this->assertEquals(EstadoCredito::Desembolsado, $credito->fresh()->estado);
+    }
+
+    public function test_reversada_la_liquidacion_se_puede_volver_a_liquidar_con_la_fecha_real(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $credito = $this->crearCredito($this->crearCliente(), [
+            'valor_prestamo' => 1_000_000,
+            'tasa_interes' => 2,
+            'fecha_desembolso' => now()->subDays(60)->toDateString(),
+        ]);
+        $this->crearCuota($credito, ['numero_cuota' => 1, 'fecha_vencimiento' => now()->addMonth()->toDateString(), 'valor' => 1_020_000, 'valor_capital' => 1_000_000, 'valor_interes' => 20_000]);
+        $liquidacion = app(PagoService::class)->liquidarCredito($credito->fresh(), FormaPago::Efectivo, null, null)['pago'];
+
+        $this->postJson($this->urlReversa($liquidacion), ['motivo' => self::MOTIVO])->assertOk();
+
+        $fechaReal = now('America/Bogota')->subDays(30)->toDateString();
+        $respuesta = $this->postJson("/api/v1/creditos/{$credito->id}/liquidacion", ['forma_pago' => 'transferencia', 'fecha_pago' => $fechaReal]);
+
+        // 30 días desde el desembolso al 2 % mensual: el interés de la reliquidación es 20.000, no el de 60 días.
+        $respuesta->assertStatus(201)->assertJsonPath('dias_transcurridos', 30);
+        $nueva = Pago::findOrFail($respuesta->json('pago.id'));
+        $this->assertSame('1020000.00', $nueva->valor_pago->aDecimalString());
+        $this->assertEquals($fechaReal, $nueva->fecha_pago->toDateString());
+        $this->assertEquals(EstadoCredito::Pagado, $credito->fresh()->estado);
     }
 
     public function test_contable_con_el_permiso_de_reversa_puede_reversar(): void

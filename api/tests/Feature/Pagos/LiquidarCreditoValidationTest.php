@@ -55,6 +55,46 @@ class LiquidarCreditoValidationTest extends TestCase
         $respuesta->assertStatus(422)->assertJsonValidationErrors('observacion');
     }
 
+    public function test_rechaza_fecha_de_pago_futura_o_con_formato_invalido(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->crearCredito($this->crearCliente());
+        $this->crearCuota($credito);
+        $url = "/api/v1/creditos/{$credito->id}/liquidacion";
+
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'fecha_pago' => now()->addDays(2)->toDateString()])
+            ->assertStatus(422)->assertJsonValidationErrors('fecha_pago');
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'fecha_pago' => '15/01/2026'])
+            ->assertStatus(422)->assertJsonValidationErrors('fecha_pago');
+        $this->getJson($url.'?fecha_pago='.now()->addDays(2)->toDateString())
+            ->assertStatus(422)->assertJsonValidationErrors('fecha_pago');
+        $this->assertDatabaseCount('pagos', 0);
+    }
+
+    public function test_rechaza_fecha_de_pago_anterior_al_desembolso(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->crearCredito($this->crearCliente(), ['fecha_desembolso' => '2026-01-01']);
+        $this->crearCuota($credito);
+
+        $this->postJson("/api/v1/creditos/{$credito->id}/liquidacion", ['forma_pago' => 'efectivo', 'fecha_pago' => '2025-12-31'])
+            ->assertStatus(422)->assertJsonValidationErrors('fecha_pago');
+        $this->assertDatabaseCount('pagos', 0);
+    }
+
+    public function test_cotiza_con_fecha_de_pago(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->crearCredito($this->crearCliente(), ['fecha_desembolso' => now()->subDays(40)->toDateString()]);
+        $this->crearCuota($credito, ['valor' => 300]);
+        $fechaPago = now('America/Bogota')->subDays(10)->toDateString();
+
+        $this->getJson("/api/v1/creditos/{$credito->id}/liquidacion?fecha_pago={$fechaPago}")
+            ->assertOk()
+            ->assertJsonPath('dias_transcurridos', 30)
+            ->assertJsonPath('fecha_pago', $fechaPago);
+    }
+
     public function test_credito_inexistente_devuelve_404_al_cotizar(): void
     {
         $this->actingAsAdmin();

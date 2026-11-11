@@ -11,4 +11,6 @@ export type ApiSettlementQuote = {
     /** Decimal string (ej. "12345.66"), no number — viene de `App\Core\Dinero\Dinero`. */
     total: string;
     fecha_referencia: string;
+    /** Fecha hasta la que se cuentan los días (`Y-m-d`): la `fecha_pago` enviada, o hoy si no se envió. */
+    fecha_pago: string;
 };

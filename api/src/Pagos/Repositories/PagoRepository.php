@@ -96,9 +96,15 @@ class PagoRepository extends BaseRepository
             ->get();
     }
 
+    /** Un pago reversado no cuenta: si no, reversar una liquidación dejaría su fecha como punto de partida del interés. */
     public function ultimoPago(int $creditoId): ?Pago
     {
-        return $this->consulta()->where('credito_id', $creditoId)->orderByDesc('fecha_pago')->first();
+        return $this->consulta()
+            ->where('credito_id', $creditoId)
+            ->whereDoesntHave('reversa')
+            ->orderByDesc('fecha_pago')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /** Último pago aplicado al crédito que no está reversado: el único que admite reversa, para no reordenar la aplicación. */

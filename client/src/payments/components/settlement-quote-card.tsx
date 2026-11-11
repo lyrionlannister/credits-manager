@@ -13,7 +13,7 @@ export const SettlementQuoteCard: FC<SettlementQuoteCardProps> = ({ cotizacion }
         <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">Días transcurridos</p>
             <p className="mt-1 font-semibold text-gray-800 dark:text-white/90">
-                {cotizacion.dias_transcurridos} (desde {formatDateEs(cotizacion.fecha_referencia)})
+                {cotizacion.dias_transcurridos} (del {formatDateEs(cotizacion.fecha_referencia)} al {formatDateEs(cotizacion.fecha_pago)})
             </p>
         </div>
         <div>
