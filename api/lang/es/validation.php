@@ -243,6 +243,7 @@ return [
             'ya_reversado' => 'Este pago ya fue reversado.',
             'no_es_ultimo' => 'Solo se puede reversar el último pago aplicado del crédito. Reversa primero los pagos posteriores.',
             'interes_ya_facturado' => 'El interés de alguna cuota de este pago ya se facturó. Anula esa factura antes de reversar el pago.',
+            'reprogramado_despues' => 'El crédito se reprogramó después de este pago: ya no se puede reversar automáticamente.',
         ],
         'credito_origen_id' => [
             'pertenece_a_otro_cliente' => 'El crédito seleccionado no pertenece a este cliente.',
@@ -295,6 +296,9 @@ return [
         ],
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
+        ],
+        'valor_pago' => [
+            'excede_saldo' => 'El pago supera lo que se debe del crédito. El máximo que se puede recibir es :maximo.',
         ],
         'usuario' => [
             'credenciales_invalidas' => 'Usuario o contraseña incorrectos.',

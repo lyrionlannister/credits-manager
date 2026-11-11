@@ -78,23 +78,19 @@ class PagoServiceTest extends TestCase
         $this->assertEquals(0, $cuotas[2]->valor_pagado->aFloat());
     }
 
-    public function test_sobrepago_se_descarta_silenciosamente_y_no_se_abona_a_nada(): void
+    public function test_un_sobrepago_se_rechaza_y_no_deja_rastro(): void
     {
         $credito = $this->creditoConTresCuotas();
 
-        $resultado = app(PagoService::class)->registrarPago($credito, Dinero::desdePesos(1000), FormaPago::Efectivo, null, null);
+        try {
+            app(PagoService::class)->registrarPago($credito, Dinero::desdePesos(1000), FormaPago::Efectivo, null, null);
+            $this->fail('Debió rechazar el sobrepago.');
+        } catch (ValidationException $excepcion) {
+            $this->assertArrayHasKey('valor_pago', $excepcion->errors());
+        }
 
-        $cuotas = $credito->cuotas()->orderBy('numero_cuota')->get();
-
-        $this->assertEquals(300, $cuotas[0]->valor_pagado->aFloat());
-        $this->assertEquals(300, $cuotas[1]->valor_pagado->aFloat());
-        $this->assertEquals(300, $cuotas[2]->valor_pagado->aFloat());
-        $this->assertSame(EstadoCuota::Pagada, $cuotas[0]->estado);
-        $this->assertSame(EstadoCuota::Pagada, $cuotas[1]->estado);
-        $this->assertSame(EstadoCuota::Pagada, $cuotas[2]->estado);
-
-        $this->assertEquals(100, $resultado['sobrante']->aFloat());
-        $this->assertEquals(1000, $resultado['pago']->valor_pago->aFloat());
+        $this->assertDatabaseCount('pagos', 0);
+        $this->assertEquals(0, $credito->cuotas()->sum('valor_pagado'));
     }
 
     public function test_credito_se_marca_pagado_solo_cuando_todas_las_cuotas_quedan_pagadas(): void

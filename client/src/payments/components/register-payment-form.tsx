@@ -129,7 +129,8 @@ export const RegisterPaymentForm: FC<RegisterPaymentFormProps> = ({ detalle }) =
                             </div>
 
                             <p className="text-sm text-gray-500 sm:col-span-2 dark:text-gray-400">
-                                El pago se aplicará automáticamente a la cuota vencida/pendiente más antigua primero.
+                                El pago cubre primero las cuotas vencidas y la cuota en curso. Lo que sobre se abona a
+                                capital: el plazo no cambia y las cuotas siguientes bajan.
                             </p>
 
                             <div className="flex gap-3 border-t border-gray-100 pt-6 sm:col-span-2 dark:border-gray-800">

@@ -69,6 +69,7 @@ class PagoController extends Controller
         return response()->json([
             'pago' => $resultado['pago'],
             'sobrante' => $resultado['sobrante'],
+            'abono_capital' => $resultado['abono_capital'],
         ], 201);
     }
 
