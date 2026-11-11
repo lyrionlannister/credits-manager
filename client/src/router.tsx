@@ -63,6 +63,7 @@ const ScheduledTasksPage = lazyPage(() => import('./monitoring/pages/scheduled-t
 const ActiveSessionsPage = lazyPage(() => import('./security/pages/active-sessions-page'), 'ActiveSessionsPage');
 const AccessHistoryPage = lazyPage(() => import('./security/pages/access-history-page'), 'AccessHistoryPage');
 const CompanyAdminsPage = lazyPage(() => import('./security/pages/company-admins-page'), 'CompanyAdminsPage');
+const AccesosSoportePage = lazyPage(() => import('./soporte/pages/accesos-soporte-page'), 'AccesosSoportePage');
 const CalendarPage = lazyPage(() => import('./calendar/pages/calendar-page'), 'CalendarPage');
 const TaxObligationsPage = lazyPage(() => import('./tax-obligations/pages/tax-obligations-page'), 'TaxObligationsPage');
 const CreateEconomicActivityPage = lazyPage(() => import('./expenses/pages/create-economic-activity-page'), 'CreateEconomicActivityPage');
@@ -487,6 +488,10 @@ const routes: RouteObject[] = [
                                 <AccessHistoryPage />
                             </RequireSuperAdmin>
                         ),
+                    },
+                    {
+                        path: 'seguridad/acceso-soporte',
+                        element: <AccesosSoportePage />,
                     },
                     {
                         path: 'seguridad/admins-empresa',

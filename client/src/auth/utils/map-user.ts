@@ -29,5 +29,6 @@ export function mapUser(apiUser: ApiUser): User {
         permissions: buildEffectivePermissions(apiUser),
         isSuperAdmin: apiUser.es_superadmin,
         mustChangePassword: apiUser.debe_cambiar_clave,
+        permissionVersion: apiUser.version_permisos ?? 1,
     };
 }
