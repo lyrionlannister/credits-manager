@@ -81,6 +81,21 @@ class CrearCreditoValidationTest extends TestCase
         $this->assertDatabaseCount('creditos', 0);
     }
 
+    public function test_quincenal_exige_primer_vencimiento_el_15_o_fin_de_mes(): void
+    {
+        $this->actingAsAdmin();
+        $cliente = $this->crearCliente();
+        $quincenal = [...$this->payloadValido($cliente->id), 'tipo_pago' => TipoPago::Quincenal->value];
+
+        $this->postJson('/api/v1/creditos', [...$quincenal, 'fecha_primer_vencimiento' => '2026-01-10'])
+            ->assertStatus(422)->assertJsonValidationErrors('fecha_primer_vencimiento');
+        $this->assertDatabaseCount('creditos', 0);
+
+        $respuesta = $this->postJson('/api/v1/creditos', [...$quincenal, 'fecha_primer_vencimiento' => '2026-01-31'])->assertStatus(201);
+        $fechas = DB::table('cuotas')->where('credito_id', $respuesta->json('credito.id'))->orderBy('numero_cuota')->limit(3)->pluck('fecha_vencimiento')->all();
+        $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28'], $fechas);
+    }
+
     public function test_con_primer_vencimiento_la_primera_cuota_cobra_interes_por_dias(): void
     {
         $this->actingAsAdmin();

@@ -96,7 +96,7 @@ class PlanCuotasService
      */
     public function rehacerCuotas(Credito $credito, Collection $reemplazables, Dinero $capital, float $tasa, array $fechas, int $siguienteNumero, ?Dinero $otrosPorCuota = null): array
     {
-        $calculo = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0]);
+        $calculo = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0], prorratearPrimera: false);
         $plan = $calculo['cuotas'];
         $hoy = CarbonImmutable::now('America/Bogota')->startOfDay();
         $sinCapital = ! $capital->esPositivo();

@@ -273,7 +273,8 @@ export const CreateCreditForm: FC = () => {
                 <p className="text-sm text-gray-500 md:col-span-3 dark:text-gray-400">
                     Las cuotas se generan automáticamente con el <strong>sistema francés</strong> (cuota fija, interés
                     compuesto sobre saldo insoluto). Si eliges el primer vencimiento, la primera cuota cobra el interés
-                    de los días reales desde el desembolso y las demás siguen cada periodo desde esa fecha.
+                    de los días reales desde el desembolso y las demás siguen cada periodo desde esa fecha. En quincenal las
+                    cuotas vencen el 15 y el último día de cada mes.
                 </p>
 
                 <div className="flex justify-end border-t border-gray-100 pt-6 md:col-span-3 dark:border-gray-800">

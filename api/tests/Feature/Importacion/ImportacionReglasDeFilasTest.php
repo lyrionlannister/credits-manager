@@ -81,7 +81,7 @@ class ImportacionReglasDeFilasTest extends TestCase
         $this->assertStringContainsString('Periodicidad no reconocida', implode(' ', $this->motivosDeRechazo($id)));
     }
 
-    public function test_quincenal_se_calcula_con_periodos_de_quince_dias(): void
+    public function test_quincenal_vence_el_15_y_el_ultimo_dia_del_mes(): void
     {
         $this->actingAsAdmin();
         $this->cliente();
@@ -89,7 +89,7 @@ class ImportacionReglasDeFilasTest extends TestCase
         $this->importarCompleto('creditos', self::CREDITOS."CR-Q;1001;01/10/2023;1000000;2;3;Quincenal;;No;;;;\n");
 
         $fechas = Cuota::query()->whereHas('credito', fn ($q) => $q->where('codigo', 'CR-Q'))->orderBy('numero_cuota')->pluck('fecha_vencimiento')->map(fn ($f) => $f->format('Y-m-d'))->all();
-        $this->assertSame(['2023-10-16', '2023-10-31', '2023-11-15'], $fechas);
+        $this->assertSame(['2023-10-15', '2023-10-31', '2023-11-15'], $fechas);
     }
 
     public function test_un_credito_sin_cedula_se_rechaza_con_su_columna(): void

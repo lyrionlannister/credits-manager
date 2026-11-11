@@ -65,6 +65,10 @@ class CreditoService
             $tasa = (float) ($datos['tasa_interes'] ?? $credito->tasa_interes);
             $cuotasRestantes = (int) $datos['cuotas_restantes'];
             $primerVencimiento = CarbonImmutable::parse($datos['fecha_primer_vencimiento']);
+
+            if ($credito->tipo_pago === TipoPago::Quincenal && ! AmortizacionCalculator::esDiaQuincenal($primerVencimiento)) {
+                throw ValidationException::withMessages(['fecha_primer_vencimiento' => __('validation.custom.fecha_primer_vencimiento.dia_quincenal')]);
+            }
             $fechas = array_map(
                 fn (int $periodo) => AmortizacionCalculator::sumarPeriodos($primerVencimiento, $periodo, $credito->tipo_pago)->toDateString(),
                 range(0, $cuotasRestantes - 1),

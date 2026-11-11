@@ -297,6 +297,9 @@ return [
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
         ],
+        'fecha_primer_vencimiento' => [
+            'dia_quincenal' => 'En un crédito quincenal el primer vencimiento debe caer el 15 o el último día del mes.',
+        ],
         'reprogramacion' => [
             'sin_cuotas' => 'El crédito no tiene cuotas sin pagos que se puedan reprogramar.',
         ],
