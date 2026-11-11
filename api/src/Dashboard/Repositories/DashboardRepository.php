@@ -51,7 +51,13 @@ class DashboardRepository
             ->where('clientes.empresa_id', $empresaId)
             ->whereNull('pagos.borrado_en')
             ->where('pagos.fecha_pago', '>=', $desde)
-            ->where('pagos.fecha_pago', '<', $hasta);
+            ->where('pagos.fecha_pago', '<', $hasta)
+            // Misma regla que ComportamientoMensualRepository: una reversa del mismo mes o anterior saca el pago; una posterior no lo borra de su mes.
+            ->whereNotExists(fn ($reversa) => $reversa->selectRaw('1')
+                ->from('reversas_pago')
+                ->whereColumn('reversas_pago.pago_id', 'pagos.id')
+                ->where('reversas_pago.empresa_id', $empresaId)
+                ->whereRaw('SUBSTR(reversas_pago.fecha, 1, 7) <= SUBSTR(pagos.fecha_pago, 1, 7)'));
 
         return $this->filtrarCreditos($consulta, EstadoCredito::cases(), $asesorId, $clienteId, $estado)
             ->selectRaw($this->expresionMes('pagos.fecha_pago').' AS mes, COALESCE(SUM(pagos.valor_pago), 0) AS valor')

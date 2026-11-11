@@ -20,7 +20,7 @@ import { CREDIT_TRANSITION_ACTION_CONFIG } from '../constants/credit-transition-
 import { puedeCancelarCredito } from '../utils/can-cancel-credit';
 import type { ApiCreditDetail } from '../types/api-credit-detail';
 import type { CreditTransitionAction } from '../types/credit-transition-action';
-import { CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal } from 'lucide-react';
+import { CalendarClock, CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal } from 'lucide-react';
 
 export const CreditDetailPage: FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -90,7 +90,7 @@ export const CreditDetailPage: FC = () => {
         return <PageSkeleton />;
     }
 
-    const { credito, saldo, cartera, refinanciacion, pagos, resumen_cuotas: resumenCuotas } = detalle;
+    const { credito, saldo, cartera, mora, refinanciacion, pagos, resumen_cuotas: resumenCuotas } = detalle;
     const valorPrestamoNumerico = parseFloat(credito.valor_prestamo);
     const porcentajeCapitalRecuperado =
         valorPrestamoNumerico > 0 ? (Number(resumenCuotas.saldo_capital_pagado) / valorPrestamoNumerico) * 100 : 0;
@@ -101,7 +101,7 @@ export const CreditDetailPage: FC = () => {
 
             {refinanciacion && <RefinancingNotice vinculo={refinanciacion} valorPrestamo={credito.valor_prestamo} className="mb-6" />}
 
-            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} />
+            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} mora={mora} />
 
             <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <CreditInstallmentsChartCard cuotas={credito.cuotas ?? []} />
@@ -153,6 +153,11 @@ export const CreditDetailPage: FC = () => {
                                 Liquidar crédito
                             </Button>
                         </>
+                    )}
+                    {credito.estado === 'desembolsado' && canEditar && (
+                        <Button iconOnly startIcon={<CalendarClock className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/reprogramar`)}>
+                            Reprogramar
+                        </Button>
                     )}
                     {canViewPayments && (
                         <Button iconOnly startIcon={<Receipt className="size-4" />} variant="outline" onClick={() => navigate(`/pagos/creditos/${credito.id}`)}>

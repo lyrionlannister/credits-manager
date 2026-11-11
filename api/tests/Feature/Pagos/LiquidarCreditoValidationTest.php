@@ -95,6 +95,53 @@ class LiquidarCreditoValidationTest extends TestCase
             ->assertJsonPath('fecha_pago', $fechaPago);
     }
 
+    /** 1.000.000 al 2 % mensual, 30 días: interés 20.000, total 1.020.000. */
+    private function creditoParaDescuento()
+    {
+        $credito = $this->crearCredito($this->crearCliente(), [
+            'valor_prestamo' => 1_000_000,
+            'tasa_interes' => 2,
+            'fecha_desembolso' => now('America/Bogota')->subDays(30)->toDateString(),
+        ]);
+        $this->crearCuota($credito, ['valor' => 1_020_000, 'valor_capital' => 1_000_000, 'valor_interes' => 20_000, 'fecha_vencimiento' => now()->addMonth()->toDateString()]);
+
+        return $credito;
+    }
+
+    public function test_liquida_con_descuento_de_intereses_y_motivo(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $credito = $this->creditoParaDescuento();
+
+        $respuesta = $this->postJson("/api/v1/creditos/{$credito->id}/liquidacion", [
+            'forma_pago' => 'transferencia',
+            'valor_pago' => 1_010_000,
+            'motivo_descuento' => 'Acuerdo de pago aprobado por gerencia',
+        ]);
+
+        $respuesta->assertStatus(201)->assertJsonPath('descuento', '10000.00');
+        $this->assertDatabaseHas('pagos', ['credito_id' => $credito->id, 'valor_pago' => 101_000_000, 'valor_interes' => 1_000_000, 'valor_capital' => 100_000_000]);
+        $this->assertSame(EstadoCredito::Pagado, $credito->fresh()->estado);
+    }
+
+    public function test_el_descuento_exige_motivo_y_no_toca_el_capital(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->creditoParaDescuento();
+        $url = "/api/v1/creditos/{$credito->id}/liquidacion";
+
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'valor_pago' => 1_010_000])
+            ->assertStatus(422)->assertJsonValidationErrors('motivo_descuento');
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'valor_pago' => 999_000, 'motivo_descuento' => 'Acuerdo de pago'])
+            ->assertStatus(422)->assertJsonValidationErrors('valor_pago');
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'valor_pago' => 1_030_000, 'motivo_descuento' => 'Acuerdo de pago'])
+            ->assertStatus(422)->assertJsonValidationErrors('valor_pago');
+        $this->postJson($url, ['forma_pago' => 'efectivo', 'valor_pago' => 0])
+            ->assertStatus(422)->assertJsonValidationErrors('valor_pago');
+        $this->assertDatabaseCount('pagos', 0);
+    }
+
     public function test_credito_inexistente_devuelve_404_al_cotizar(): void
     {
         $this->actingAsAdmin();

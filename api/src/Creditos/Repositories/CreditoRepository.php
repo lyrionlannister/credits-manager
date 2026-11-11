@@ -5,6 +5,7 @@ namespace App\Creditos\Repositories;
 use App\Core\Base\BaseRepository;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\EstadoCuota;
+use App\Creditos\Enums\TipoPago;
 use App\Creditos\Models\Credito;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,6 +24,16 @@ class CreditoRepository extends BaseRepository
      * Créditos desembolsados de la empresa, con su cliente. La empresa y el asesor van explícitos: la cartera
      * para exportar corre en el worker, sin sesión, donde los scopes no filtran.
      */
+    /** Sin sesión (comando artisan): la empresa llega explícita. */
+    public function quincenalesDesembolsadosDeEmpresa(int $empresaId): Collection
+    {
+        return $this->consultaDeEmpresa($empresaId)
+            ->where('estado', EstadoCredito::Desembolsado)
+            ->where('tipo_pago', TipoPago::Quincenal)
+            ->orderBy('id')
+            ->get(['id', 'empresa_id', 'codigo', 'fecha_desembolso', 'tipo_pago', 'estado']);
+    }
+
     public function activosDeEmpresa(int $empresaId, ?int $asesorId): Collection
     {
         return $this->restringirAAsesor($this->consultaDeEmpresa($empresaId), $empresaId, $asesorId)

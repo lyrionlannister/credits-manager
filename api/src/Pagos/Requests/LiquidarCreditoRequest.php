@@ -19,6 +19,8 @@ class LiquidarCreditoRequest extends FormRequest
         return [
             'forma_pago' => ['required', Rule::enum(FormaPago::class)],
             'fecha_pago' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'valor_pago' => ['nullable', 'numeric', 'min:0.01'],
+            'motivo_descuento' => ['nullable', 'string', 'max:500'],
             'observacion' => ['nullable', 'string', 'max:255'],
         ];
     }

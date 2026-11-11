@@ -33,7 +33,7 @@ export const CreditPaymentsPage: FC = () => {
         return <PageSkeleton />;
     }
 
-    const { credito, saldo, cartera, pagos } = detalle;
+    const { credito, saldo, cartera, mora, pagos } = detalle;
 
     return (
         <div className="flex min-h-full flex-col pb-6">
@@ -45,7 +45,7 @@ export const CreditPaymentsPage: FC = () => {
                 </div>
             )}
 
-            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} />
+            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} mora={mora} />
 
             <div className="mb-6 flex flex-wrap gap-3 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3">
                 {credito.estado === 'desembolsado' && canRegisterPayment && (

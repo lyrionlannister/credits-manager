@@ -17,6 +17,7 @@ export const AccountStatementInstallmentsTable: FC<AccountStatementInstallmentsT
                     <tr className="border-b border-gray-200 text-left text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
                         <th className="py-2 pr-4 font-medium whitespace-nowrap">#</th>
                         <th className="py-2 pr-4 font-medium whitespace-nowrap">Vencimiento</th>
+                        <th className="py-2 pr-4 font-medium whitespace-nowrap">Fecha de pago</th>
                         <th className="py-2 pr-4 font-medium whitespace-nowrap">Capital</th>
                         <th className="py-2 pr-4 font-medium whitespace-nowrap">Intereses</th>
                         <th className="py-2 pr-4 font-medium whitespace-nowrap">Total de la cuota</th>
@@ -29,6 +30,7 @@ export const AccountStatementInstallmentsTable: FC<AccountStatementInstallmentsT
                         <tr key={cuota.id} className="border-b border-gray-100 text-gray-700 dark:border-gray-800 dark:text-gray-300">
                             <td className="py-2 pr-4 whitespace-nowrap">{cuota.numero_cuota}</td>
                             <td className="py-2 pr-4 whitespace-nowrap">{formatDateEs(cuota.fecha_vencimiento)}</td>
+                            <td className="py-2 pr-4 whitespace-nowrap">{cuota.fecha_pago ? formatDateEs(cuota.fecha_pago) : '—'}</td>
                             <td className="py-2 pr-4 whitespace-nowrap">{formatMoney(cuota.valor_capital)}</td>
                             <td className="py-2 pr-4 whitespace-nowrap">{formatMoney(cuota.valor_interes)}</td>
                             <td className="py-2 pr-4 whitespace-nowrap">{formatMoney(cuota.valor_total_cuota)}</td>
@@ -37,7 +39,7 @@ export const AccountStatementInstallmentsTable: FC<AccountStatementInstallmentsT
                         </tr>
                     ))}
                     <tr className="border-t-2 border-gray-800 font-semibold text-gray-800 dark:border-white/90 dark:text-white/90">
-                        <td className="py-2 pr-4" colSpan={5}>
+                        <td className="py-2 pr-4" colSpan={6}>
                             Saldo pendiente a la fecha
                         </td>
                         <td className="py-2 pr-4" colSpan={2}>

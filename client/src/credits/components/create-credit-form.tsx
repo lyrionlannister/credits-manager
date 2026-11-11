@@ -54,6 +54,7 @@ export const CreateCreditForm: FC = () => {
     const [plazo, setPlazo] = useState('');
     const [tipoPago, setTipoPago] = useState<PaymentType>('mensual');
     const [fechaDesembolso, setFechaDesembolso] = useState(HOY);
+    const [fechaPrimerVencimiento, setFechaPrimerVencimiento] = useState('');
 
     const [error, setError] = useState<string | null>(null);
     const [isPreviewing, setIsPreviewing] = useState(false);
@@ -81,6 +82,7 @@ export const CreateCreditForm: FC = () => {
         plazo,
         tipo_pago: tipoPago,
         fecha_desembolso: fechaDesembolso,
+        fecha_primer_vencimiento: fechaPrimerVencimiento || null,
     });
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
@@ -258,9 +260,21 @@ export const CreateCreditForm: FC = () => {
                     />
                 </div>
 
+                <div>
+                    <Label htmlFor="fecha-primer-vencimiento">Primer vencimiento (opcional)</Label>
+                    <DatePicker
+                        id="fecha-primer-vencimiento"
+                        name="fecha-primer-vencimiento"
+                        value={fechaPrimerVencimiento}
+                        onChange={setFechaPrimerVencimiento}
+                    />
+                </div>
+
                 <p className="text-sm text-gray-500 md:col-span-3 dark:text-gray-400">
                     Las cuotas se generan automáticamente con el <strong>sistema francés</strong> (cuota fija, interés
-                    compuesto sobre saldo insoluto).
+                    compuesto sobre saldo insoluto). Si eliges el primer vencimiento, la primera cuota cobra el interés
+                    de los días reales desde el desembolso y las demás siguen cada periodo desde esa fecha. En quincenal las
+                    cuotas vencen el 15 y el último día de cada mes.
                 </p>
 
                 <div className="flex justify-end border-t border-gray-100 pt-6 md:col-span-3 dark:border-gray-800">

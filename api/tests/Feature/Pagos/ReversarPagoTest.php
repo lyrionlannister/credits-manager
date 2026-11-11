@@ -176,7 +176,8 @@ class ReversarPagoTest extends TestCase
     {
         $this->actingAsAdmin();
         $credito = $this->creditoConTresCuotas();
-        $pago = $this->pagar($credito, 300);
+        // La cuota en curso (100) más todo el capital de las siguientes (160) salda el crédito.
+        $pago = $this->pagar($credito, 260);
 
         $this->assertEquals(EstadoCredito::Pagado, $credito->fresh()->estado);
 
@@ -225,7 +226,8 @@ class ReversarPagoTest extends TestCase
 
         $this->postJson($this->urlReversa($liquidacion), ['motivo' => self::MOTIVO])->assertOk();
 
-        $esperado = [1 => [100, EstadoCuota::Pagada], 2 => [50, EstadoCuota::Pendiente], 3 => [0, EstadoCuota::Pendiente]];
+        // El pago de 150 cubrió la cuota en curso y abonó 50 a capital sobre ella misma; las siguientes no tenían pagos.
+        $esperado = [1 => [150, EstadoCuota::Pagada], 2 => [0, EstadoCuota::Pendiente], 3 => [0, EstadoCuota::Pendiente]];
         foreach ($esperado as $numero => [$pagado, $estado]) {
             $cuota = $credito->cuotas()->where('numero_cuota', $numero)->firstOrFail();
             $this->assertEquals($pagado, $cuota->valor_pagado->aFloat(), "cuota {$numero}");

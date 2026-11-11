@@ -145,6 +145,43 @@ class DashboardTest extends TestCase
         $this->assertSame('500.00', $respuesta->json('historico.colocacion.11'));
     }
 
+    public function test_el_recaudo_no_cuenta_un_pago_reversado_en_su_mismo_mes(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $this->datosDeFebrero($admin->empresa_id);
+
+        $pago = Pago::where('empresa_id', $admin->empresa_id)->where('fecha_pago', '>=', '2026-02-01')->where('fecha_pago', '<', '2026-03-01')->firstOrFail();
+        DB::table('reversas_pago')->insert([
+            'empresa_id' => $admin->empresa_id,
+            'pago_id' => $pago->id,
+            'fecha' => '2026-02-20',
+            'valor' => $pago->valor_pago->centavos(),
+            'motivo' => 'Cheque devuelto por el banco',
+            'creado_en' => now(),
+        ]);
+
+        $esperado = number_format((25000 - $pago->valor_pago->centavos()) / 100, 2, '.', '');
+        $this->getJson(self::RUTA.'?periodo=2026-02')->assertOk()->assertJsonPath('metricas.recaudo.valor', $esperado);
+    }
+
+    public function test_una_reversa_de_un_mes_posterior_no_saca_el_pago_de_su_mes(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $this->datosDeFebrero($admin->empresa_id);
+
+        $pago = Pago::where('empresa_id', $admin->empresa_id)->where('fecha_pago', '>=', '2026-02-01')->where('fecha_pago', '<', '2026-03-01')->firstOrFail();
+        DB::table('reversas_pago')->insert([
+            'empresa_id' => $admin->empresa_id,
+            'pago_id' => $pago->id,
+            'fecha' => '2026-03-05',
+            'valor' => $pago->valor_pago->centavos(),
+            'motivo' => 'Cheque devuelto por el banco',
+            'creado_en' => now(),
+        ]);
+
+        $this->getJson(self::RUTA.'?periodo=2026-02')->assertOk()->assertJsonPath('metricas.recaudo.valor', '250.00');
+    }
+
     public function test_los_datos_de_otra_empresa_no_cuentan(): void
     {
         $empresaA = $this->crearEmpresaDePrueba();

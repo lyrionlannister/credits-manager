@@ -58,6 +58,22 @@ class CuotaRepository extends BaseRepository
             ->get();
     }
 
+    /** Incluye las que una reprogramación dejó en `borrado_en`: la foto del plan anterior las puede devolver. */
+    public function deCreditoConEliminadas(int $creditoId, array $ids): Collection
+    {
+        return $this->consulta()
+            ->withTrashed()
+            ->where('credito_id', $creditoId)
+            ->whereIn('id', $ids)
+            ->lockForUpdate()
+            ->get();
+    }
+
+    public function eliminarDeCreditoExcepto(int $creditoId, array $idsQueSeQuedan): void
+    {
+        $this->consulta()->where('credito_id', $creditoId)->whereNotIn('id', $idsQueSeQuedan)->delete();
+    }
+
     public function eliminarTodasDeCredito(int $creditoId): void
     {
         $this->consulta()->where('credito_id', $creditoId)->delete();

@@ -24,11 +24,14 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito }) => {
     const [formaPago, setFormaPago] = useState<PaymentMethod>('efectivo');
     const [fechaPago, setFechaPago] = useState('');
     const [observacion, setObservacion] = useState('');
+    const [valorAcordado, setValorAcordado] = useState('');
+    const [motivoDescuento, setMotivoDescuento] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const quoteEndpoint = `/creditos/${credito.id}/liquidacion${fechaPago ? `?fecha_pago=${fechaPago}` : ''}`;
     const { data: cotizacion, error: quoteError } = useResource<ApiSettlementQuote>(quoteEndpoint);
+    const conDescuento = cotizacion !== null && valorAcordado !== '' && Number(valorAcordado) < Number(cotizacion.total);
 
     const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -38,7 +41,13 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito }) => {
         try {
             await sendRequest(`/creditos/${credito.id}/liquidacion`, {
                 method: 'POST',
-                body: { forma_pago: formaPago, fecha_pago: fechaPago || null, observacion: observacion || null },
+                body: {
+                    forma_pago: formaPago,
+                    fecha_pago: fechaPago || null,
+                    valor_pago: valorAcordado || null,
+                    motivo_descuento: conDescuento ? motivoDescuento : null,
+                    observacion: observacion || null,
+                },
             });
 
             navigate(`/pagos/creditos/${credito.id}`, { replace: true, state: { message: 'Crédito liquidado correctamente.' } });
@@ -89,6 +98,36 @@ export const SettleCreditForm: FC<SettleCreditFormProps> = ({ credito }) => {
                             maxDate={new Date().toISOString().slice(0, 10)}
                         />
                     </div>
+
+                    <div>
+                        <Label htmlFor="valor-acordado">Valor acordado (opcional)</Label>
+                        <Input
+                            id="valor-acordado"
+                            name="valor-acordado"
+                            type="number"
+                            step={0.01}
+                            min="0"
+                            placeholder={cotizacion?.total}
+                            value={valorAcordado}
+                            onChange={(event) => setValorAcordado(event.target.value)}
+                        />
+                        <p className="mt-1.5 text-theme-xs text-gray-500 dark:text-gray-400">
+                            Si es menor al total, la diferencia se descuenta de los intereses.
+                        </p>
+                    </div>
+
+                    {conDescuento && (
+                        <div>
+                            <Label htmlFor="motivo-descuento">Motivo del descuento</Label>
+                            <Input
+                                id="motivo-descuento"
+                                name="motivo-descuento"
+                                required
+                                value={motivoDescuento}
+                                onChange={(event) => setMotivoDescuento(event.target.value)}
+                            />
+                        </div>
+                    )}
 
                     <div className="sm:col-span-2">
                         <Label htmlFor="observacion">Observación (opcional)</Label>

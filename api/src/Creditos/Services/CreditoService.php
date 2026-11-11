@@ -10,14 +10,17 @@ use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\TipoCredito;
 use App\Creditos\Enums\TipoPago;
+use App\Creditos\Enums\TipoReprogramacion;
 use App\Creditos\Exportaciones\FuenteCreditos;
 use App\Creditos\Models\Credito;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
+use App\Creditos\Repositories\ReprogramacionCreditoRepository;
 use App\Exportacion\Enums\FormatoExportacion;
 use App\Exportacion\Models\Exportacion;
 use App\Exportacion\Services\ExportacionService;
 use App\Usuarios\Models\Usuario;
+use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +35,83 @@ class CreditoService
         protected ComprobanteService $comprobantes,
         protected EmisorAuditoria $auditoria,
         protected ExportacionService $exportaciones,
+        protected PlanCuotasService $planCuotas,
+        protected ReprogramacionCreditoRepository $reprogramaciones,
     ) {}
+
+    /**
+     * Reprograma el mismo crédito desembolsado: el capital de las cuotas que aún no tienen pagos ni interés devengado
+     * se reparte en `cuotas_restantes` cuotas nuevas desde `fecha_primer_vencimiento` (tasa nueva si se envía). Las
+     * cuotas pagadas, con abonos o con interés ya devengado no se tocan y se siguen debiendo. No crea otro crédito.
+     */
+    public function reprogramar(Credito $credito, array $datos): Credito
+    {
+        return DB::transaction(function () use ($credito, $datos) {
+            $credito = $this->creditos->bloquear($credito->id);
+            $this->exigirEstado($credito, EstadoCredito::Desembolsado);
+
+            $anteriores = $this->auditoria->instantanea($credito);
+            $planAnterior = $this->planCuotas->fotografiar($credito);
+
+            $reprogramables = $this->cuotas->pendientesOrdenadasParaActualizar($credito->id)
+                ->filter(fn ($cuota) => $cuota->valor_pagado->esCero() && $cuota->interes_devengado_en === null)
+                ->values();
+
+            if ($reprogramables->isEmpty()) {
+                throw ValidationException::withMessages(['credito' => __('validation.custom.reprogramacion.sin_cuotas')]);
+            }
+
+            $capital = Dinero::sumarVarios(...$reprogramables->pluck('valor_capital')->all());
+            $tasa = (float) ($datos['tasa_interes'] ?? $credito->tasa_interes);
+            $cuotasRestantes = (int) $datos['cuotas_restantes'];
+            $primerVencimiento = CarbonImmutable::parse($datos['fecha_primer_vencimiento']);
+
+            if ($credito->tipo_pago === TipoPago::Quincenal && ! AmortizacionCalculator::esDiaQuincenal($primerVencimiento)) {
+                throw ValidationException::withMessages(['fecha_primer_vencimiento' => __('validation.custom.fecha_primer_vencimiento.dia_quincenal')]);
+            }
+            $fechas = array_map(
+                fn (int $periodo) => AmortizacionCalculator::sumarPeriodos($primerVencimiento, $periodo, $credito->tipo_pago)->toDateString(),
+                range(0, $cuotasRestantes - 1),
+            );
+
+            $calculo = $this->planCuotas->rehacerCuotas(
+                $credito,
+                $reprogramables,
+                $capital,
+                $tasa,
+                $fechas,
+                (int) $this->cuotas->todasPorCredito($credito->id)->max('numero_cuota') + 1,
+                OtrosGastosCalculator::valorPorCuota($this->cuotaService->capitalPendiente($credito), (float) $credito->gastos_administracion_pct),
+            );
+            $this->planCuotas->recalcularSaldoCapital($credito);
+            $credito = $this->planCuotas->actualizarTotalesDelCredito($credito, $calculo['valor_cuota'], $tasa);
+
+            $reprogramacion = $this->reprogramaciones->crear([
+                'credito_id' => $credito->id,
+                'tipo' => TipoReprogramacion::Reprogramacion,
+                'motivo' => $datos['motivo'],
+                'plan_anterior' => $planAnterior,
+                'creado_por' => Auth::id(),
+            ]);
+
+            $this->auditoria->registrarModificacion(
+                AuditoriaConstants::MODULO_CREDITOS,
+                "Crédito #{$credito->id} reprogramado: {$cuotasRestantes} cuota(s) sobre {$capital->aDecimalString()} de capital",
+                $credito,
+                $anteriores,
+                motivo: $datos['motivo'],
+                adicionales: [
+                    'reprogramacion_id' => $reprogramacion->id,
+                    'capital_reprogramado' => $capital->aDecimalString(),
+                    'cuotas_reemplazadas' => $reprogramables->count(),
+                    'cuotas_nuevas' => $cuotasRestantes,
+                    'efecto_contable' => 'ninguno: el capital adeudado no cambia, solo su calendario',
+                ],
+            );
+
+            return $this->creditos->obtenerConRelaciones($credito);
+        });
+    }
 
     public function listarCreditos(?string $busqueda, int $porPagina, int $pagina, ?int $clienteId = null, ?EstadoCredito $estado = null): LengthAwarePaginator
     {
@@ -90,6 +169,7 @@ class CreditoService
                 (int) $datos['plazo'],
                 TipoPago::from($datos['tipo_pago']),
                 $datos['fecha_desembolso'],
+                $datos['fecha_primer_vencimiento'] ?? null,
             );
 
             $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos));
@@ -123,6 +203,7 @@ class CreditoService
             $plazo,
             TipoPago::from($datos['tipo_pago']),
             $datos['fecha_desembolso'],
+            $datos['fecha_primer_vencimiento'] ?? null,
         );
 
         $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($valorPrestamo, $porcentajeGastos);
@@ -171,6 +252,7 @@ class CreditoService
                 (int) $datos['plazo'],
                 TipoPago::from($datos['tipo_pago']),
                 $datos['fecha_desembolso'],
+                $datos['fecha_primer_vencimiento'] ?? null,
             );
 
             $this->cuotas->eliminarTodasDeCredito($credito->id);

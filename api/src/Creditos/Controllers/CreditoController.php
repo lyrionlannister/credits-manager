@@ -10,6 +10,7 @@ use App\Creditos\Requests\EditarCreditoRequest;
 use App\Creditos\Requests\ExportarCreditosRequest;
 use App\Creditos\Requests\ExportarEstadoCuentaRequest;
 use App\Creditos\Requests\PrevisualizarCreditoRequest;
+use App\Creditos\Requests\ReprogramarCreditoRequest;
 use App\Creditos\Services\CreditoService;
 use App\Creditos\Services\CuotaService;
 use App\Creditos\Services\EstadoCuentaService;
@@ -73,6 +74,11 @@ class CreditoController extends Controller
         return response()->json(['credito' => $this->creditos->editarCondiciones($credito, $peticion->validated())]);
     }
 
+    public function reprogramar(ReprogramarCreditoRequest $peticion, Credito $credito): JsonResponse
+    {
+        return response()->json(['credito' => $this->creditos->reprogramar($credito, $peticion->validated())]);
+    }
+
     public function actualizarGastosAdministracion(ActualizarGastosAdministracionRequest $peticion, Credito $credito): JsonResponse
     {
         $credito = $this->creditos->actualizarGastosAdministracion(
@@ -92,6 +98,7 @@ class CreditoController extends Controller
             'credito' => $credito,
             'saldo' => $this->cuotas->saldoCredito($credito->id),
             'cartera' => $this->cuotas->estadoCartera($credito),
+            'mora' => $this->cuotas->resumenMora($credito->id),
             'refinanciacion' => $this->creditos->vinculoRefinanciacion($credito),
             'pagos' => $this->pagos->listarPorCredito($credito->id, 'desc'),
             'resumen_cuotas' => $this->cuotas->resumenAlDia($credito->id, $credito->valor_prestamo),

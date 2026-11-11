@@ -5,6 +5,7 @@ namespace App\Creditos\Requests;
 use App\Creditos\Enums\TipoCredito;
 use App\Creditos\Enums\TipoPago;
 use App\Creditos\Models\Credito;
+use App\Creditos\Rules\VencimientoQuincenalValido;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,6 +31,7 @@ class EditarCreditoRequest extends FormRequest
             'plazo' => ['required', 'integer', 'min:1'],
             'tipo_pago' => ['required', Rule::enum(TipoPago::class)],
             'fecha_desembolso' => ['required', 'date'],
+            'fecha_primer_vencimiento' => ['nullable', 'date_format:Y-m-d', 'after:fecha_desembolso', new VencimientoQuincenalValido($this->input('tipo_pago'))],
             'motivo' => ['required', 'string', 'max:500'],
         ];
     }

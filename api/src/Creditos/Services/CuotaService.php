@@ -60,6 +60,23 @@ class CuotaService
         return $this->cuotas->contarVencidas($credito->id) > 0 ? 'En mora' : 'Al día';
     }
 
+    /**
+     * Cuánto se debe en mora: lo que falta de las cuotas vencidas (capital, interés y otros gastos del plan) y los días
+     * desde la primera vencida. No incluye interés de mora: la empresa no tiene una tasa de mora definida.
+     *
+     * @return array{monto_vencido: Dinero, cuotas_vencidas: int, dias: int}
+     */
+    public function resumenMora(int $creditoId): array
+    {
+        $fila = $this->cuotas->resumenPorCreditos([$creditoId])[$creditoId] ?? ['saldo_mora' => 0, 'vencidas' => 0, 'primera_fecha_vencida' => null];
+
+        return [
+            'monto_vencido' => Dinero::desdeCentavos($fila['saldo_mora']),
+            'cuotas_vencidas' => $fila['vencidas'],
+            'dias' => $this->diasMoraDesdeFecha($fila['primera_fecha_vencida']),
+        ];
+    }
+
     public function diasMora(int $creditoId): int
     {
         return $this->diasMoraDesdeFecha($this->cuotas->primeraFechaVencida($creditoId));

@@ -9,11 +9,15 @@ use App\Contabilidad\Services\ComprobanteService;
 use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\EstadoCuota;
+use App\Creditos\Enums\TipoReprogramacion;
 use App\Creditos\Models\Credito;
 use App\Creditos\Models\Cuota;
+use App\Creditos\Models\ReprogramacionCredito;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
+use App\Creditos\Repositories\ReprogramacionCreditoRepository;
 use App\Creditos\Services\OtrosGastosCalculator;
+use App\Creditos\Services\PlanCuotasService;
 use App\Exportacion\Enums\FormatoExportacion;
 use App\Exportacion\Models\Exportacion;
 use App\Exportacion\Services\ExportacionService;
@@ -47,6 +51,8 @@ class PagoService
         protected EmisorAuditoria $auditoria,
         protected ExportacionService $exportaciones,
         protected DocumentoFacturacionService $documentosFacturacion,
+        protected PlanCuotasService $planCuotas,
+        protected ReprogramacionCreditoRepository $reprogramaciones,
     ) {}
 
     public function solicitarExportacion(Usuario $usuario, ?string $busqueda, ?string $mes, FormatoExportacion $formato): Exportacion
@@ -56,6 +62,33 @@ class PagoService
             $formato,
             $usuario,
         );
+    }
+
+    /**
+     * Fecha real en que se pagó cada cuota pagada: la del último pago vigente que le aplicó dinero o, si la cerró una
+     * liquidación (que no deja detalle por cuota), la de esa liquidación.
+     *
+     * @param  iterable<Cuota>  $cuotas
+     * @return array<int, string|null> cuota_id => `Y-m-d`
+     */
+    public function fechasDePagoPorCuota(int $creditoId, iterable $cuotas): array
+    {
+        $aplicado = $this->pagoDetalles->ultimoPagoVigentePorCuota($creditoId);
+        $liquidacion = $this->pagos->liquidacionVigente($creditoId)?->fecha_pago?->toDateString();
+        $fechas = [];
+
+        foreach ($cuotas as $cuota) {
+            $porDetalle = $aplicado[$cuota->id] ?? null;
+            $cubiertaPorDetalle = $porDetalle !== null && $porDetalle['total'] >= $cuota->valor_pagado->centavos();
+
+            $fechas[$cuota->id] = match (true) {
+                $cuota->estado !== EstadoCuota::Pagada => $porDetalle['fecha'] ?? null,
+                $cubiertaPorDetalle || $liquidacion === null => $porDetalle['fecha'] ?? null,
+                default => $liquidacion,
+            };
+        }
+
+        return $fechas;
     }
 
     public function listarPorCredito(int $creditoId, string $direccion = 'desc'): Collection
@@ -81,9 +114,12 @@ class PagoService
             $this->exigirReversible($credito, $pago);
 
             $creditoAnteriores = $this->auditoria->instantanea($credito);
-            $cuotasAfectadas = $pago->detalles()->exists()
-                ? $this->restaurarCuotas($credito, $pago)
-                : $this->restaurarCuotasDeLiquidacion($credito, $pago);
+            $abono = $this->reprogramaciones->vigenteDePago($pago->id);
+            $cuotasAfectadas = match (true) {
+                $abono !== null => $this->deshacerAbonoACapital($credito, $abono),
+                $pago->detalles()->exists() => $this->restaurarCuotas($credito, $pago),
+                default => $this->restaurarCuotasDeLiquidacion($credito, $pago),
+            };
 
             $this->recalcularSaldoCapital($credito);
 
@@ -134,15 +170,18 @@ class PagoService
     }
 
     /**
-     * Aplica el pago a las cuotas pendientes/vencidas del crédito, de la más antigua a la más reciente. El
-     * sobrante, si el pago excede lo adeudado, se descarta silenciosamente — no se guarda ni se abona a nada.
+     * Aplica el pago a lo exigible a la fecha del pago (cuotas vencidas y la cuota en curso), de la más antigua a la
+     * más reciente. Lo que exceda se abona a capital: las cuotas siguientes se rehacen con el mismo plazo y una cuota
+     * menor. Un pago que supera incluso todo el capital pendiente se rechaza; no se descarta nada en silencio.
      */
     public function registrarPago(Credito $credito, Dinero $valorPago, FormaPago $formaPago, ?string $observacion, ?int $usuarioId, ?string $fechaPago = null): array
     {
         $this->exigirDesembolsado($credito);
 
         return DB::transaction(function () use ($credito, $valorPago, $formaPago, $observacion, $usuarioId, $fechaPago) {
+            $credito = $this->creditos->bloquear($credito->id);
             $creditoAnteriores = $this->auditoria->instantanea($credito);
+            $planAnterior = $this->planCuotas->fotografiar($credito);
 
             $pago = $this->pagos->crear([
                 'credito_id' => $credito->id,
@@ -155,12 +194,22 @@ class PagoService
             ]);
 
             $aplicacion = $this->aplicarAlPlan($credito, $pago, $valorPago);
-            $this->pagos->actualizar($pago, ['valor_capital' => $aplicacion['capital'], 'valor_interes' => $aplicacion['interes'], 'valor_otros_gastos' => $aplicacion['otros']]);
-            $restante = $aplicacion['sobrante'];
-            $capitalTotal = $aplicacion['capital'];
+            $abonoCapital = $aplicacion['sobrante']->esPositivo() && $aplicacion['en_curso'] !== null
+                ? $this->abonarACapital($credito, $pago, $aplicacion['sobrante'], $aplicacion['en_curso'], $planAnterior, $usuarioId)
+                : Dinero::cero();
+            $restante = $aplicacion['sobrante']->restar($abonoCapital);
+
+            if ($restante->esPositivo()) {
+                throw ValidationException::withMessages(['valor_pago' => __('validation.custom.valor_pago.excede_saldo', [
+                    'maximo' => $valorPago->restar($restante)->aDecimalString(),
+                ])]);
+            }
+
+            $capitalTotal = $aplicacion['capital']->sumar($abonoCapital);
             $interesTotal = $aplicacion['interes'];
             $otrosTotal = $aplicacion['otros'];
             $cuotasAfectadas = $aplicacion['cuotas'];
+            $this->pagos->actualizar($pago, ['valor_capital' => $capitalTotal, 'valor_interes' => $interesTotal, 'valor_otros_gastos' => $otrosTotal]);
 
             $this->recalcularSaldoCapital($credito);
 
@@ -181,7 +230,7 @@ class PagoService
                     'capital' => $capitalTotal,
                     'interes' => $interesTotal,
                     'otros_gastos' => $otrosTotal,
-                    'sobrante_descartado' => $restante,
+                    'abono_capital' => $abonoCapital,
                     'cuotas_afectadas' => $cuotasAfectadas,
                     'comprobante_id' => $comprobante?->id,
                     'recibo' => $recibo->numero,
@@ -194,7 +243,7 @@ class PagoService
                 $creditoAnteriores,
             );
 
-            return ['pago' => $pago, 'sobrante' => $restante];
+            return ['pago' => $pago, 'sobrante' => $restante, 'abono_capital' => $abonoCapital];
         });
     }
 
@@ -271,38 +320,57 @@ class PagoService
         ];
     }
 
-    public function liquidarCredito(Credito $credito, FormaPago $formaPago, ?string $observacion, ?int $usuarioId, ?string $fechaPago = null): array
-    {
-        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId, $fechaPago) {
+    /**
+     * `$valorAcordado` menor al total cotizado es un descuento: sale solo de los intereses (nunca del capital ni de los
+     * otros gastos), exige motivo y el comprobante se contabiliza con el interés ya descontado, así que cuadra.
+     */
+    public function liquidarCredito(
+        Credito $credito,
+        FormaPago $formaPago,
+        ?string $observacion,
+        ?int $usuarioId,
+        ?string $fechaPago = null,
+        ?Dinero $valorAcordado = null,
+        ?string $motivoDescuento = null,
+    ): array {
+        return DB::transaction(function () use ($credito, $formaPago, $observacion, $usuarioId, $fechaPago, $valorAcordado, $motivoDescuento) {
             $creditoAnteriores = $this->auditoria->instantanea($credito);
             $cotizacion = $this->calcularLiquidacion($credito, $fechaPago);
+            $descuento = $this->descuentoDeLiquidacion($cotizacion, $valorAcordado, $motivoDescuento);
+            $interesCobrado = $cotizacion['interes']->restar($descuento);
+            $valorPago = $cotizacion['total']->restar($descuento);
 
             $pago = $this->pagos->crear([
                 'credito_id' => $credito->id,
                 'cliente_id' => $credito->cliente_id,
-                'valor_pago' => $cotizacion['total'],
+                'valor_pago' => $valorPago,
                 'valor_capital' => $cotizacion['capital_pendiente'],
-                'valor_interes' => $cotizacion['interes'],
+                'valor_interes' => $interesCobrado,
                 'valor_otros_gastos' => $cotizacion['otros_gastos'],
                 'fecha_pago' => $fechaPago !== null ? CarbonImmutable::parse($fechaPago, 'America/Bogota')->startOfDay() : now(),
                 'forma_pago' => $formaPago,
-                'observacion' => $observacion ?? 'Liquidación anticipada del crédito',
+                'observacion' => $observacion ?? ($descuento->esPositivo()
+                    ? "Liquidación anticipada con descuento de intereses de {$descuento->aDecimalString()}: {$motivoDescuento}"
+                    : 'Liquidación anticipada del crédito'),
                 'registrado_por' => $usuarioId,
             ]);
 
             $this->cuotas->cerrarPendientesComoOrigen($credito->id);
             $this->recalcularSaldoCapital($credito);
             $this->creditos->marcarComoPagado($credito);
-            $comprobante = $this->comprobantes->contabilizarRecaudoPago($pago, $cotizacion['capital_pendiente'], $cotizacion['interes'], $cotizacion['otros_gastos'], $credito->cliente->tercero_id);
+            $comprobante = $this->comprobantes->contabilizarRecaudoPago($pago, $cotizacion['capital_pendiente'], $interesCobrado, $cotizacion['otros_gastos'], $credito->cliente->tercero_id);
             $recibo = $this->recibos->emitir($pago, $comprobante);
 
             $this->auditoria->registrarCreacion(
                 AuditoriaConstants::MODULO_PAGOS,
-                "Liquidación anticipada del crédito #{$credito->id}: pago #{$pago->id} de {$cotizacion['total']->aDecimalString()}",
+                "Liquidación anticipada del crédito #{$credito->id}: pago #{$pago->id} de {$valorPago->aDecimalString()}",
                 $pago,
                 [
                     'capital' => $cotizacion['capital_pendiente'],
-                    'interes' => $cotizacion['interes'],
+                    'interes' => $interesCobrado,
+                    'interes_calculado' => $cotizacion['interes'],
+                    'descuento_interes' => $descuento,
+                    'motivo_descuento' => $descuento->esPositivo() ? $motivoDescuento : null,
                     'comprobante_id' => $comprobante?->id,
                     'recibo' => $recibo->numero,
                 ],
@@ -314,8 +382,31 @@ class PagoService
                 $creditoAnteriores,
             );
 
-            return ['pago' => $pago, ...$cotizacion];
+            return ['pago' => $pago, ...$cotizacion, 'descuento' => $descuento];
         });
+    }
+
+    private function descuentoDeLiquidacion(array $cotizacion, ?Dinero $valorAcordado, ?string $motivo): Dinero
+    {
+        if ($valorAcordado === null || $valorAcordado->igualA($cotizacion['total'])) {
+            return Dinero::cero();
+        }
+
+        if ($valorAcordado->mayorOIgualQue($cotizacion['total'])) {
+            throw ValidationException::withMessages(['valor_pago' => __('validation.custom.liquidacion.mayor_al_total', ['total' => $cotizacion['total']->aDecimalString()])]);
+        }
+
+        $descuento = $cotizacion['total']->restar($valorAcordado);
+        if ($descuento->mayorOIgualQue($cotizacion['interes']->sumar(Dinero::desdeCentavos(1)))) {
+            $minimo = $cotizacion['capital_pendiente']->sumar($cotizacion['otros_gastos']);
+            throw ValidationException::withMessages(['valor_pago' => __('validation.custom.liquidacion.descuento_sobre_capital', ['minimo' => $minimo->aDecimalString()])]);
+        }
+
+        if (trim((string) $motivo) === '') {
+            throw ValidationException::withMessages(['motivo_descuento' => __('validation.custom.liquidacion.motivo_requerido')]);
+        }
+
+        return $descuento;
     }
 
     /**
@@ -392,9 +483,14 @@ class PagoService
     /**
      * @return array{sobrante: Dinero, capital: Dinero, interes: Dinero, otros: Dinero, cuotas: list<int>}
      */
+    /** Solo lo exigible a la fecha del pago: las vencidas y la primera que aún no vence (la cuota en curso). */
     private function aplicarAlPlan(Credito $credito, Pago $pago, Dinero $valor): array
     {
-        $cuotas = $this->cuotas->pendientesOrdenadasParaActualizar($credito->id)->values();
+        $fechaPago = CarbonImmutable::parse($pago->fecha_pago)->startOfDay();
+        $pendientes = $this->cuotas->pendientesOrdenadasParaActualizar($credito->id)->values();
+        $posicionEnCurso = $pendientes->search(fn ($cuota) => $cuota->fecha_vencimiento->gte($fechaPago));
+        $cuotas = $posicionEnCurso === false ? $pendientes : $pendientes->take($posicionEnCurso + 1);
+        $enCurso = $posicionEnCurso === false ? null : $pendientes[$posicionEnCurso];
 
         $aplicacion = AplicadorPagoPlan::aplicar(
             $cuotas->map(fn ($cuota) => [
@@ -431,7 +527,66 @@ class PagoService
             'interes' => $aplicacion['interes'],
             'otros' => $aplicacion['otros'],
             'cuotas' => $cuotasAfectadas,
+            'en_curso' => $enCurso,
         ];
+    }
+
+    /**
+     * El excedente se suma al capital de la cuota en curso (ya cubierta) y las cuotas siguientes se rehacen sobre el
+     * capital que queda, con las mismas fechas y la misma tasa. La foto del plan anterior queda guardada para que la
+     * reversa de este pago lo devuelva tal cual. Si alguna cuota siguiente ya tiene pagos o interés devengado no se
+     * rehace nada: el excedente vuelve como sobrante y el pago se rechaza.
+     */
+    private function abonarACapital(Credito $credito, Pago $pago, Dinero $excedente, Cuota $enCurso, array $planAnterior, ?int $usuarioId): Dinero
+    {
+        $siguientes = $this->cuotas->pendientesOrdenadasParaActualizar($credito->id)
+            ->filter(fn (Cuota $cuota) => $cuota->numero_cuota > $enCurso->numero_cuota)
+            ->values();
+
+        $intocable = $siguientes->contains(fn (Cuota $cuota) => ! $cuota->valor_pagado->esCero() || $cuota->interes_devengado_en !== null);
+        if ($siguientes->isEmpty() || $intocable) {
+            return Dinero::cero();
+        }
+
+        $capitalSiguiente = Dinero::sumarVarios(...$siguientes->pluck('valor_capital')->all());
+        $abono = $excedente->menorEntre($capitalSiguiente);
+
+        $this->pagoDetalles->crear(['pago_id' => $pago->id, 'cuota_id' => $enCurso->id, 'valor_aplicado' => $abono]);
+        $this->cuotas->actualizar($enCurso, [
+            'valor' => $enCurso->valor->sumar($abono),
+            'valor_capital' => $enCurso->valor_capital->sumar($abono),
+            'valor_pagado' => $enCurso->valor_pagado->sumar($abono),
+        ]);
+
+        $this->planCuotas->rehacerCuotas(
+            $credito,
+            $siguientes,
+            $capitalSiguiente->restar($abono),
+            (float) $credito->tasa_interes,
+            $siguientes->map(fn (Cuota $cuota) => $cuota->fecha_vencimiento->toDateString())->all(),
+            $siguientes->max('numero_cuota') + 1,
+        );
+        $this->planCuotas->actualizarTotalesDelCredito($credito, $siguientes->first()->valor);
+
+        $this->reprogramaciones->crear([
+            'credito_id' => $credito->id,
+            'pago_id' => $pago->id,
+            'tipo' => TipoReprogramacion::AbonoCapital,
+            'valor_abono' => $abono,
+            'plan_anterior' => $planAnterior,
+            'creado_por' => $usuarioId,
+        ]);
+
+        return $abono;
+    }
+
+    /** @return list<int> ids de las cuotas devueltas al plan anterior al abono */
+    private function deshacerAbonoACapital(Credito $credito, ReprogramacionCredito $abono): array
+    {
+        $ids = $this->planCuotas->restaurar($credito, $abono->plan_anterior);
+        $this->reprogramaciones->eliminar($abono);
+
+        return $ids;
     }
 
     /**
@@ -498,6 +653,10 @@ class PagoService
 
         if ($this->pagos->ultimoVigenteDelCredito($credito->id)?->id !== $pago->id) {
             throw ValidationException::withMessages(['pago' => __('validation.custom.reversa.no_es_ultimo')]);
+        }
+
+        if ($this->reprogramaciones->existeReprogramacionDespuesDe($credito->id, $pago->creado_en)) {
+            throw ValidationException::withMessages(['pago' => __('validation.custom.reversa.reprogramado_despues')]);
         }
 
         // Si el interés de alguna cuota de este pago ya se facturó ("Facturar intereses pagados"), reversar el

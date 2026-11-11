@@ -9,7 +9,9 @@ use App\Exportacion\Contracts\FuenteExportable;
 use App\Exportacion\Data\ColumnaExportable;
 use App\Exportacion\Enums\TipoColumna;
 use App\Exportacion\Services\AccesoExportaciones;
+use App\Pagos\Services\PagoService;
 use App\Usuarios\Models\Usuario;
+use Carbon\CarbonImmutable;
 
 /**
  * Plan de cuotas de un crédito con lo pagado y el saldo, a Excel/CSV. Las mismas columnas del estado de cuenta
@@ -47,6 +49,7 @@ final class FuenteEstadoCuenta implements FuenteExportable
         return [
             new ColumnaExportable('numero', 'Cuota', TipoColumna::Entero),
             new ColumnaExportable('vencimiento', 'Vencimiento', TipoColumna::Fecha),
+            new ColumnaExportable('fecha_pago', 'Fecha de pago', TipoColumna::Fecha),
             new ColumnaExportable('capital', 'Capital', TipoColumna::Monetario),
             new ColumnaExportable('intereses', 'Intereses', TipoColumna::Monetario),
             new ColumnaExportable('total', 'Total de la cuota', TipoColumna::Monetario),
@@ -63,13 +66,18 @@ final class FuenteEstadoCuenta implements FuenteExportable
         $total = Dinero::cero();
         $totalPagado = Dinero::cero();
 
-        foreach (app(CuotaRepository::class)->cursorDelCredito($this->creditoId) as $cuota) {
+        // El crédito ya se validó contra la empresa: las fechas de pago se leen por su id, también sin sesión en el worker.
+        $cuotas = app(CuotaRepository::class)->todasPorCredito($this->creditoId);
+        $fechasPago = app(PagoService::class)->fechasDePagoPorCuota($this->creditoId, $cuotas);
+
+        foreach ($cuotas as $cuota) {
             $total = $total->sumar($cuota->valor_total_cuota);
             $totalPagado = $totalPagado->sumar($cuota->valor_pagado);
 
             yield [
                 'numero' => $cuota->numero_cuota,
                 'vencimiento' => $cuota->fecha_vencimiento,
+                'fecha_pago' => isset($fechasPago[$cuota->id]) ? CarbonImmutable::parse($fechasPago[$cuota->id]) : null,
                 'capital' => $cuota->valor_capital,
                 'intereses' => $cuota->valor_interes,
                 'total' => $cuota->valor_total_cuota,
@@ -82,6 +90,7 @@ final class FuenteEstadoCuenta implements FuenteExportable
         yield [
             'numero' => null,
             'vencimiento' => null,
+            'fecha_pago' => null,
             'capital' => null,
             'intereses' => null,
             'total' => $total,

@@ -170,22 +170,22 @@ class TrazabilidadCreditosPagosTest extends TestCase
         $this->assertNull($evento['valores_nuevos']);
     }
 
-    public function test_un_pago_deja_su_desglose_y_el_sobrante_descartado_y_marca_el_credito_saldado(): void
+    public function test_un_pago_deja_su_desglose_y_su_abono_a_capital_y_marca_el_credito_saldado(): void
     {
         $this->actingAsAdmin();
         $this->crearReglasDeCreditoYPago();
         $credito = $this->crearCredito($this->crearCliente(), ['valor_prestamo' => 300]);
         $cuota = $this->crearCuota($credito, ['valor' => 300, 'valor_interes' => 50, 'valor_capital' => 250]);
 
-        $pagoId = $this->postJson("/api/v1/creditos/{$credito->id}/pagos", ['valor_pago' => 350, 'forma_pago' => 'efectivo'])
+        $pagoId = $this->postJson("/api/v1/creditos/{$credito->id}/pagos", ['valor_pago' => 300, 'forma_pago' => 'efectivo'])
             ->assertCreated()->json('pago.id');
 
         $pago = $this->assertEventoAuditoria('crear', 'pagos', 'pago', $pagoId);
         $this->assertSame('250.00', $pago['valores_nuevos']['capital']);
         $this->assertSame('50.00', $pago['valores_nuevos']['interes']);
-        $this->assertSame('50.00', $pago['valores_nuevos']['sobrante_descartado']);
+        $this->assertSame('0.00', $pago['valores_nuevos']['abono_capital']);
         $this->assertSame([$cuota->id], $pago['valores_nuevos']['cuotas_afectadas']);
-        $this->assertSame('350.00', $pago['valores_nuevos']['valor_pago']);
+        $this->assertSame('300.00', $pago['valores_nuevos']['valor_pago']);
 
         $saldado = $this->assertEventoAuditoria('modificar', 'creditos', 'credito', $credito->id);
         $this->assertSame('pagado', $saldado['valores_nuevos']['estado']);
