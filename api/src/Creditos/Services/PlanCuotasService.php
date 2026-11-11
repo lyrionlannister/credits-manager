@@ -8,6 +8,7 @@ use App\Creditos\Models\Credito;
 use App\Creditos\Models\Cuota;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
+use App\Pagos\Services\AplicadorPagoPlan;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -93,15 +94,16 @@ class PlanCuotasService
      * @param  Collection<int, Cuota>  $reemplazables  ya ordenadas y sin pagos
      * @param  list<string>  $fechas  `Y-m-d`, una por cuota nueva
      */
-    public function rehacerCuotas(Credito $credito, Collection $reemplazables, Dinero $capital, float $tasa, array $fechas, int $siguienteNumero): void
+    public function rehacerCuotas(Credito $credito, Collection $reemplazables, Dinero $capital, float $tasa, array $fechas, int $siguienteNumero, ?Dinero $otrosPorCuota = null): array
     {
-        $plan = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0])['cuotas'];
+        $calculo = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0]);
+        $plan = $calculo['cuotas'];
         $hoy = CarbonImmutable::now('America/Bogota')->startOfDay();
         $sinCapital = ! $capital->esPositivo();
         $reemplazables = $reemplazables->values();
 
         foreach ($plan as $posicion => $fila) {
-            $otros = $sinCapital ? Dinero::cero() : ($reemplazables[$posicion]->valor_otros_gastos ?? Dinero::cero());
+            $otros = $sinCapital ? Dinero::cero() : ($otrosPorCuota ?? $reemplazables[$posicion]->valor_otros_gastos ?? Dinero::cero());
             $datos = [
                 'fecha_vencimiento' => $fechas[$posicion],
                 'valor' => $fila['valor'],
@@ -127,6 +129,19 @@ class PlanCuotasService
         $sobrantes = $reemplazables->slice(count($plan));
         foreach ($sobrantes as $cuota) {
             $this->cuotas->eliminar($cuota);
+        }
+
+        return $calculo;
+    }
+
+    /** Misma derivación que `PagoService::recalcularSaldoCapital`: el saldo corrido según lo pagado de cada cuota. */
+    public function recalcularSaldoCapital(Credito $credito): void
+    {
+        $capitalRestante = $credito->valor_prestamo;
+
+        foreach ($this->cuotas->todasOrdenadasParaActualizar($credito->id) as $cuota) {
+            $capitalRestante = $capitalRestante->restar(AplicadorPagoPlan::desglosePagado($cuota->valor_pagado, $cuota->valor_interes, $cuota->valor_otros_gastos)['capital']);
+            $this->cuotas->actualizar($cuota, ['saldo_capital' => $capitalRestante->noNegativo()]);
         }
     }
 

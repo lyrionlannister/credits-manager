@@ -20,7 +20,7 @@ import { CREDIT_TRANSITION_ACTION_CONFIG } from '../constants/credit-transition-
 import { puedeCancelarCredito } from '../utils/can-cancel-credit';
 import type { ApiCreditDetail } from '../types/api-credit-detail';
 import type { CreditTransitionAction } from '../types/credit-transition-action';
-import { CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal } from 'lucide-react';
+import { CalendarClock, CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal } from 'lucide-react';
 
 export const CreditDetailPage: FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -153,6 +153,11 @@ export const CreditDetailPage: FC = () => {
                                 Liquidar crédito
                             </Button>
                         </>
+                    )}
+                    {credito.estado === 'desembolsado' && canEditar && (
+                        <Button iconOnly startIcon={<CalendarClock className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/reprogramar`)}>
+                            Reprogramar
+                        </Button>
                     )}
                     {canViewPayments && (
                         <Button iconOnly startIcon={<Receipt className="size-4" />} variant="outline" onClick={() => navigate(`/pagos/creditos/${credito.id}`)}>

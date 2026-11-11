@@ -186,6 +186,7 @@ Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
     Route::post('/creditos/exportar', [CreditoController::class, 'exportar'])->middleware('exportacion:creditos.listado');
     Route::get('/creditos/{credito}', [CreditoController::class, 'show'])->middleware('permiso:creditos,listar');
     Route::patch('/creditos/{credito}', [CreditoController::class, 'update'])->middleware('permiso:creditos,editar');
+    Route::post('/creditos/{credito}/reprogramacion', [CreditoController::class, 'reprogramar'])->middleware('permiso:creditos,editar');
     Route::patch('/creditos/{credito}/gastos-administracion', [CreditoController::class, 'actualizarGastosAdministracion'])->middleware('permiso:creditos,editar');
     Route::get('/creditos/{credito}/estado-cuenta', [CreditoController::class, 'estadoCuenta'])->middleware('permiso:creditos,listar');
     Route::post('/creditos/{credito}/estado-cuenta/exportar', [CreditoController::class, 'estadoCuentaExportar'])->middleware('exportacion:creditos.estado_cuenta');

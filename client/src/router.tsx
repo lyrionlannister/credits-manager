@@ -111,6 +111,7 @@ const EditEmployerPage = lazyPage(() => import('./employers/pages/edit-employer-
 const EmployersListPage = lazyPage(() => import('./employers/pages/employers-list-page'), 'EmployersListPage');
 const AccountStatementPage = lazyPage(() => import('./credits/pages/account-statement-page'), 'AccountStatementPage');
 const EditCreditPage = lazyPage(() => import('./credits/pages/edit-credit-page'), 'EditCreditPage');
+const ReprogramCreditPage = lazyPage(() => import('./credits/pages/reprogram-credit-page'), 'ReprogramCreditPage');
 const CreateCreditPage = lazyPage(() => import('./credits/pages/create-credit-page'), 'CreateCreditPage');
 const CreditDetailPage = lazyPage(() => import('./credits/pages/credit-detail-page'), 'CreditDetailPage');
 const CreditsListPage = lazyPage(() => import('./credits/pages/credits-list-page'), 'CreditsListPage');
@@ -272,6 +273,14 @@ const routes: RouteObject[] = [
                         element: (
                             <RequireModulePermission modulo="creditos" accion="editar">
                                 <EditCreditPage />
+                            </RequireModulePermission>
+                        ),
+                    },
+                    {
+                        path: 'creditos/:id/reprogramar',
+                        element: (
+                            <RequireModulePermission modulo="creditos" accion="editar">
+                                <ReprogramCreditPage />
                             </RequireModulePermission>
                         ),
                     },

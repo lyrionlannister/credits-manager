@@ -297,6 +297,9 @@ return [
         'mes' => [
             'formato_invalido' => 'El mes debe tener el formato AAAA-MM.',
         ],
+        'reprogramacion' => [
+            'sin_cuotas' => 'El crédito no tiene cuotas sin pagos que se puedan reprogramar.',
+        ],
         'liquidacion' => [
             'mayor_al_total' => 'El valor de la liquidación no puede ser mayor que el total calculado (:total).',
             'descuento_sobre_capital' => 'El descuento solo puede salir de los intereses: el valor mínimo es :minimo.',
@@ -477,6 +480,8 @@ return [
         'tipo_pago' => 'tipo de pago',
         'fecha_desembolso' => 'fecha de desembolso',
         'fecha_primer_vencimiento' => 'fecha del primer vencimiento',
+        'cuotas_restantes' => 'número de cuotas',
+        'motivo_descuento' => 'motivo del descuento',
 
         // Pagos
         'valor_pago' => 'valor del pago',
