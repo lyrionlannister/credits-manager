@@ -98,6 +98,7 @@ class CreditoController extends Controller
             'credito' => $credito,
             'saldo' => $this->cuotas->saldoCredito($credito->id),
             'cartera' => $this->cuotas->estadoCartera($credito),
+            'mora' => $this->cuotas->resumenMora($credito->id),
             'refinanciacion' => $this->creditos->vinculoRefinanciacion($credito),
             'pagos' => $this->pagos->listarPorCredito($credito->id, 'desc'),
             'resumen_cuotas' => $this->cuotas->resumenAlDia($credito->id, $credito->valor_prestamo),

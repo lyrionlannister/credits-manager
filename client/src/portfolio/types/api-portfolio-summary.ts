@@ -7,6 +7,9 @@ export type ApiPortfolioEntry = {
     /** Decimal string (ej. "12345.66"), no number — viene de `App\Core\Dinero\Dinero`. */
     saldo: string;
     dias_mora?: number;
+    /** Solo en `en_mora`: lo que falta de las cuotas vencidas. Decimal string. */
+    monto_vencido?: string;
+    cuotas_vencidas?: number;
 };
 
 export type ApiPortfolioTotal = {

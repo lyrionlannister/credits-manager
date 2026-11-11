@@ -90,7 +90,7 @@ export const CreditDetailPage: FC = () => {
         return <PageSkeleton />;
     }
 
-    const { credito, saldo, cartera, refinanciacion, pagos, resumen_cuotas: resumenCuotas } = detalle;
+    const { credito, saldo, cartera, mora, refinanciacion, pagos, resumen_cuotas: resumenCuotas } = detalle;
     const valorPrestamoNumerico = parseFloat(credito.valor_prestamo);
     const porcentajeCapitalRecuperado =
         valorPrestamoNumerico > 0 ? (Number(resumenCuotas.saldo_capital_pagado) / valorPrestamoNumerico) * 100 : 0;
@@ -101,7 +101,7 @@ export const CreditDetailPage: FC = () => {
 
             {refinanciacion && <RefinancingNotice vinculo={refinanciacion} valorPrestamo={credito.valor_prestamo} className="mb-6" />}
 
-            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} />
+            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} mora={mora} />
 
             <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <CreditInstallmentsChartCard cuotas={credito.cuotas ?? []} />

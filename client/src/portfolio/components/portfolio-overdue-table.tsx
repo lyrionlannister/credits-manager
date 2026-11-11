@@ -22,6 +22,16 @@ export const PortfolioOverdueTable: FC<PortfolioOverdueTableProps> = ({ entradas
                 { key: 'telefono', label: 'Teléfono', render: (row) => row.credito.cliente?.tercero.celular ?? '—' },
                 { key: 'saldo', label: 'Saldo', render: (row) => formatMoney(row.saldo) },
                 {
+                    key: 'monto_vencido',
+                    label: 'Vencido',
+                    render: (row) => (
+                        <span className="font-medium text-error-600 dark:text-error-400">
+                            {formatMoney(row.monto_vencido ?? '0')}
+                            <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">({row.cuotas_vencidas ?? 0} cuotas)</span>
+                        </span>
+                    ),
+                },
+                {
                     key: 'dias_mora',
                     label: 'Días en mora',
                     render: (row) => (

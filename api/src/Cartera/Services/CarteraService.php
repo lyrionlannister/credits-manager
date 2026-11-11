@@ -99,7 +99,13 @@ class CarteraService
 
             if ((int) $fila['vencidas'] > 0) {
                 $diasMora = $this->cuotaService->diasMoraDesdeFecha($fila['primera_fecha_vencida']);
-                $enMora[] = ['credito' => $credito, 'saldo' => $saldo, 'dias_mora' => $diasMora];
+                $enMora[] = [
+                    'credito' => $credito,
+                    'saldo' => $saldo,
+                    'dias_mora' => $diasMora,
+                    'monto_vencido' => Dinero::desdeCentavos($fila['saldo_mora']),
+                    'cuotas_vencidas' => (int) $fila['vencidas'],
+                ];
             } else {
                 $alDia[] = ['credito' => $credito, 'saldo' => $saldo];
             }
