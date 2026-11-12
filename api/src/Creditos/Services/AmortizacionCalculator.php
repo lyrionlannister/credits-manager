@@ -3,6 +3,7 @@
 namespace App\Creditos\Services;
 
 use App\Core\Dinero\Dinero;
+use App\Creditos\Constants\CreditoConstants;
 use App\Creditos\Enums\TipoPago;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
@@ -24,8 +25,9 @@ use InvalidArgumentException;
  * por los días reales desde el desembolso; el capital de cada cuota no cambia.
  *
  * Quincenal: las cuotas vencen en días fijos, el 15 y el último día de cada mes (decisión de DDA), no cada 15 días.
- * El primer vencimiento es el siguiente de esos días después del desembolso, así que el primer periodo casi nunca dura
- * 15 días exactos: su interés siempre se prorratea por los días reales.
+ * El primer vencimiento es el siguiente de esos días después del desembolso, o el que le sigue si quedan menos de
+ * `CreditoConstants::DIAS_MINIMOS_PRIMERA_CUOTA_QUINCENAL` días, así que el primer periodo casi nunca dura 15 días
+ * exactos: su interés siempre se prorratea por los días reales.
  *
  * `$prorratearPrimera = false` cobra el periodo completo en la primera cuota: lo usa quien rehace cuotas de un plan
  * en curso, donde la primera fecha no es la de un desembolso.
@@ -51,9 +53,11 @@ class AmortizacionCalculator
         }
 
         $desembolso = CarbonImmutable::parse($fechaDesembolso)->startOfDay();
-        $primerVencimiento = $fechaPrimerVencimiento !== null
-            ? CarbonImmutable::parse($fechaPrimerVencimiento)->startOfDay()
-            : self::sumarPeriodos($desembolso, 1, $tipoPago);
+        $primerVencimiento = match (true) {
+            $fechaPrimerVencimiento !== null => CarbonImmutable::parse($fechaPrimerVencimiento)->startOfDay(),
+            $tipoPago === TipoPago::Quincenal => self::primerVencimientoQuincenal($desembolso),
+            default => self::sumarPeriodos($desembolso, 1, $tipoPago),
+        };
 
         if ($tipoPago === TipoPago::Quincenal && ! self::esDiaQuincenal($primerVencimiento)) {
             throw new InvalidArgumentException('El primer vencimiento quincenal debe caer el 15 o el último día del mes.');
@@ -121,6 +125,17 @@ class AmortizacionCalculator
         }
 
         return $resultado;
+    }
+
+    /** El siguiente 15 o fin de mes, salvo que quede demasiado cerca del desembolso: entonces el que le sigue. */
+    public static function primerVencimientoQuincenal(CarbonImmutable $desembolso): CarbonImmutable
+    {
+        $desembolso = $desembolso->startOfDay();
+        $siguiente = self::siguienteDiaQuincenal($desembolso);
+
+        return $desembolso->diffInDays($siguiente) < CreditoConstants::DIAS_MINIMOS_PRIMERA_CUOTA_QUINCENAL
+            ? self::siguienteDiaQuincenal($siguiente)
+            : $siguiente;
     }
 
     public static function esDiaQuincenal(CarbonImmutable $fecha): bool

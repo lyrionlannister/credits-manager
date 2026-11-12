@@ -143,6 +143,27 @@ class AmortizacionCalculatorTest extends TestCase
         $this->assertSame(0, end($resultado['cuotas'])['saldo_capital']->centavos());
     }
 
+    /** Desembolso el 12: el 15 queda a 3 días, así que la primera cuota pasa al 31 y cobra 19/15 del interés. */
+    public function test_quincenal_no_cobra_la_primera_cuota_a_pocos_dias_del_desembolso(): void
+    {
+        $resultado = AmortizacionCalculator::calcular(Dinero::desdePesos(300000), 3, 3, TipoPago::Quincenal, '2026-01-12');
+
+        $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
+        $this->assertSame(Dinero::desdePesos(300000)->multiplicarPorTasa(0.03 * 19 / 15)->centavos(), $resultado['cuotas'][0]['valor_interes']->centavos());
+        $this->assertSame(0, end($resultado['cuotas'])['saldo_capital']->centavos());
+    }
+
+    public function test_primer_vencimiento_quincenal_respeta_los_dias_minimos(): void
+    {
+        $primero = fn (string $desembolso) => AmortizacionCalculator::primerVencimientoQuincenal(CarbonImmutable::parse($desembolso))->toDateString();
+
+        $this->assertSame('2026-01-15', $primero('2026-01-05'));
+        $this->assertSame('2026-01-31', $primero('2026-01-06'));
+        $this->assertSame('2026-01-31', $primero('2026-01-15'));
+        $this->assertSame('2026-03-15', $primero('2026-02-27'));
+        $this->assertSame('2026-03-15', $primero('2026-02-28'));
+    }
+
     public function test_desembolso_un_15_o_fin_de_mes_vence_en_el_siguiente_dia_fijo(): void
     {
         $this->assertSame('2026-02-28', AmortizacionCalculator::siguienteDiaQuincenal(CarbonImmutable::parse('2026-02-15'))->toDateString());
