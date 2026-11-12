@@ -15,7 +15,7 @@ ENV VITE_REVERB_APP_KEY=$VITE_REVERB_APP_KEY \
     VITE_REVERB_SCHEME=$VITE_REVERB_SCHEME
 
 # Node 26 ya no trae corepack preinstalado.
-RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.13.0 --activate
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.13.1 --activate
 
 COPY client/package.json client/pnpm-lock.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
