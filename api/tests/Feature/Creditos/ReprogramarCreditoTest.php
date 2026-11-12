@@ -91,9 +91,47 @@ class ReprogramarCreditoTest extends TestCase
 
         $this->postJson($this->url($credito), [])->assertStatus(422)
             ->assertJsonValidationErrors(['cuotas_restantes', 'fecha_primer_vencimiento', 'motivo']);
-        $this->postJson($this->url($credito), $this->datos(['cuotas_restantes' => 0, 'tasa_interes' => -1, 'fecha_primer_vencimiento' => now()->subDay()->toDateString(), 'motivo' => 'abc']))
+        $this->postJson($this->url($credito), $this->datos(['cuotas_restantes' => 0, 'tasa_interes' => -1, 'fecha_primer_vencimiento' => '15/01/2026', 'motivo' => 'abc']))
             ->assertStatus(422)
             ->assertJsonValidationErrors(['cuotas_restantes', 'tasa_interes', 'fecha_primer_vencimiento', 'motivo']);
+    }
+
+    public function test_acepta_un_primer_vencimiento_pasado_y_deja_vencidas_las_cuotas_ya_cumplidas(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->credito();
+        $primerVencimiento = now()->subMonths(2)->startOfMonth()->addDays(9)->toDateString();
+
+        $this->postJson($this->url($credito), $this->datos(['tasa_interes' => 0, 'fecha_primer_vencimiento' => $primerVencimiento]))->assertOk();
+
+        $cuotas = $credito->cuotas()->orderBy('numero_cuota')->get();
+        $this->assertSame($primerVencimiento, $cuotas[0]->fecha_vencimiento->toDateString());
+        $this->assertSame(EstadoCuota::Vencida, $cuotas[0]->estado);
+        $this->assertSame(EstadoCuota::Pendiente, $cuotas->last()->estado);
+    }
+
+    public function test_rechaza_un_primer_vencimiento_que_no_es_posterior_al_desembolso(): void
+    {
+        $this->actingAsAdmin();
+        $credito = $this->credito();
+
+        $this->postJson($this->url($credito), $this->datos(['fecha_primer_vencimiento' => $credito->fecha_desembolso->toDateString()]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['fecha_primer_vencimiento' => __('validation.custom.fecha_primer_vencimiento.no_posterior_al_desembolso')]);
+        $this->assertDatabaseCount('reprogramaciones_credito', 0);
+    }
+
+    public function test_rechaza_un_primer_vencimiento_anterior_al_ultimo_pago(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $credito = $this->credito();
+        app(PagoService::class)->registrarPago($credito, Dinero::desdePesos(100), FormaPago::Efectivo, null, null, now()->subDays(10)->toDateString());
+
+        $this->postJson($this->url($credito), $this->datos(['fecha_primer_vencimiento' => now()->subDays(20)->toDateString()]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['fecha_primer_vencimiento' => __('validation.custom.fecha_primer_vencimiento.anterior_al_ultimo_pago')]);
+        $this->assertDatabaseCount('reprogramaciones_credito', 0);
     }
 
     public function test_solo_se_reprograma_un_credito_desembolsado(): void

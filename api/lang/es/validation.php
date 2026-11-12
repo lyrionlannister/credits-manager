@@ -299,6 +299,8 @@ return [
         ],
         'fecha_primer_vencimiento' => [
             'dia_quincenal' => 'En un crédito quincenal el primer vencimiento debe caer el 15 o el último día del mes.',
+            'no_posterior_al_desembolso' => 'El primer vencimiento debe ser posterior a la fecha de desembolso del crédito.',
+            'anterior_al_ultimo_pago' => 'El primer vencimiento no puede ser anterior al último pago registrado del crédito.',
         ],
         'reprogramacion' => [
             'sin_cuotas' => 'El crédito no tiene cuotas sin pagos que se puedan reprogramar.',
@@ -457,6 +459,10 @@ return [
     | están en español) — evita mensajes como "El campo valor_prestamo...".
     |
     */
+
+    'values' => [
+        'fecha_pago' => ['today' => 'hoy'],
+    ],
 
     'attributes' => [
         // Metas
