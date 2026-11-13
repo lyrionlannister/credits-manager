@@ -2,6 +2,7 @@
 
 namespace App\Auth\Middleware;
 
+use App\Usuarios\Services\DiagnosticoPermisoService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,7 +19,12 @@ class TienePermisoOSuperAdmin
         $usuario = $peticion->user();
 
         if (! $usuario || (! $usuario->es_superadmin && ! $usuario->tienePermiso($modulo, $accion))) {
-            abort(403, 'No tienes permiso para realizar esta acción.');
+            return response()->json([
+                'message' => 'No tienes permiso para realizar esta acción.',
+                'motivo_denegacion' => $usuario
+                    ? app(DiagnosticoPermisoService::class)->causa($usuario, $modulo, $accion)
+                    : 'sin_sesion',
+            ], 403);
         }
 
         return $siguiente($peticion);

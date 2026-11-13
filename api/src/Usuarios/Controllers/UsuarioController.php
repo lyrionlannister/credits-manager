@@ -33,7 +33,7 @@ class UsuarioController extends Controller
     {
         $usuario = $this->usuarios->crearUsuario($peticion->validated());
 
-        return response()->json(['usuario' => $usuario->load('rol')], 201);
+        return response()->json(['usuario' => $usuario->load(['rol', 'permisosExtra' => Usuario::soloVigentes()])], 201);
     }
 
     public function show(Usuario $usuario): JsonResponse
@@ -45,7 +45,7 @@ class UsuarioController extends Controller
     {
         $usuario = $this->usuarios->editarUsuario($usuario, $peticion->validated());
 
-        return response()->json(['usuario' => $usuario->load('rol')]);
+        return response()->json(['usuario' => $usuario->load(['rol', 'permisosExtra' => Usuario::soloVigentes()])]);
     }
 
     public function cambiarClave(CambiarClaveRequest $peticion, Usuario $usuario): Response

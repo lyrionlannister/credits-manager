@@ -87,8 +87,15 @@ class UsuarioRepository extends BaseRepository
         return $consulta->paginate(perPage: $porPagina, page: $pagina);
     }
 
+    /** Sincroniza las excepciones de la empresa del usuario. La relación `permisosExtra()` ya viene filtrada por esa empresa, así que el sync no toca excepciones de otras empresas. */
     public function sincronizarPermisosExtra(Usuario $usuario, array $mapa): void
     {
+        $mapa = collect($mapa)
+            ->mapWithKeys(fn (array $valores, int|string $permisoId) => [
+                (int) $permisoId => [...$valores, 'empresa_id' => $usuario->empresa_id],
+            ])
+            ->all();
+
         $usuario->permisosExtra()->sync($mapa);
     }
 

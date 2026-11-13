@@ -97,7 +97,7 @@ class EscaladaDePrivilegiosTest extends TestCase
         $ajeno = $this->permiso('creditos.aprobar');
 
         $this->postJson('/api/v1/usuarios', $this->payload($lectura, [
-            'permisos_extra' => [['permiso_id' => $ajeno->id, 'concedido' => true]],
+            'permisos_extra' => [['permiso_id' => $ajeno->id, 'concedido' => true, 'motivo' => 'Motivo de prueba']],
         ]))->assertForbidden();
     }
 
@@ -108,7 +108,7 @@ class EscaladaDePrivilegiosTest extends TestCase
 
         $this->postJson('/api/v1/usuarios', $this->payload($lectura, [
             'usuario' => 'creado_por_gestor',
-            'permisos_extra' => [['permiso_id' => $ajeno->id, 'concedido' => false]],
+            'permisos_extra' => [['permiso_id' => $ajeno->id, 'concedido' => false, 'motivo' => 'Motivo de prueba']],
         ]))->assertCreated();
 
         $this->assertDatabaseHas('usuarios', ['usuario' => 'creado_por_gestor', 'rol_id' => $lectura->id]);
@@ -162,7 +162,7 @@ class EscaladaDePrivilegiosTest extends TestCase
         $contable = $this->rolCon('contable', ['contabilidad.listar_comprobantes']);
 
         $this->postJson('/api/v1/usuarios', $this->payload($contable, [
-            'permisos_extra' => [['permiso_id' => $this->permiso('creditos.aprobar')->id, 'concedido' => true]],
+            'permisos_extra' => [['permiso_id' => $this->permiso('creditos.aprobar')->id, 'concedido' => true, 'motivo' => 'Motivo de prueba']],
         ]))->assertCreated();
         $this->postJson('/api/v1/usuarios', $this->payload($this->rolAdmin))->assertCreated();
     }

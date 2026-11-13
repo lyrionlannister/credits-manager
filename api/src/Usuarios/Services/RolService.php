@@ -7,6 +7,7 @@ use App\Auditoria\Enums\AccionAuditoria;
 use App\Auditoria\Services\EmisorAuditoria;
 use App\Usuarios\Constants\UsuarioConstants;
 use App\Usuarios\Models\Rol;
+use App\Usuarios\Models\Usuario;
 use App\Usuarios\Repositories\RolRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class RolService
     public function __construct(
         protected RolRepository $roles,
         protected EmisorAuditoria $auditoria,
+        protected PermisoCache $cachePermisos,
     ) {}
 
     public function paginar(?string $busqueda, int $porPagina, int $pagina): LengthAwarePaginator
@@ -63,6 +65,11 @@ class RolService
             $this->auditoria->registrarModificacion(AuditoriaConstants::MODULO_USUARIOS, "Rol {$rol->nombre} modificado", $rol, $anteriores);
 
             if ($permisosAnteriores !== $permisosNuevos) {
+                // Fase 3 y 9: la versión de permisos de cada usuario del rol cambia con él,
+                // y su caché se invalida (con evento para los demás procesos).
+                Usuario::where('rol_id', $rol->id)->increment('version_permisos');
+                Usuario::where('rol_id', $rol->id)->get()->each(fn (Usuario $usuario) => $this->cachePermisos->invalidar($usuario->fresh()));
+
                 $this->auditoria->registrar(
                     AccionAuditoria::CambioPermisos,
                     AuditoriaConstants::MODULO_USUARIOS,

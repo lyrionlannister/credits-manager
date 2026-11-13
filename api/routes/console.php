@@ -38,6 +38,12 @@ Schedule::call(fn () => app(CuotaService::class)->actualizarVencidas())
     ->name('cuotas:actualizar-vencidas')
     ->withoutOverlapping(10);
 
+/** Expira los accesos de soporte just-in-time vencidos (el servicio también expira al leer). */
+Schedule::command('soporte:expirar-accesos')
+    ->everyFifteenMinutes()
+    ->name('soporte:expirar-accesos')
+    ->withoutOverlapping(5);
+
 Schedule::command('exportaciones:limpiar')
     ->dailyAt($horaDe('exportaciones:limpiar'))
     ->when(fn () => $activaDe('exportaciones:limpiar'))
@@ -70,6 +76,12 @@ Schedule::command('contabilidad:devengar-intereses')
     ->when(fn () => $activaDe('contabilidad:devengar-intereses'))
     ->name('contabilidad:devengar-intereses')
     ->withoutOverlapping(60);
+
+Schedule::command('permisos:vencer-excepciones')
+    ->dailyAt($horaDe('permisos:vencer-excepciones'))
+    ->when(fn () => $activaDe('permisos:vencer-excepciones'))
+    ->name('permisos:vencer-excepciones')
+    ->withoutOverlapping(10);
 
 /**
  * Respaldo diario de base y archivos (los domingos y el día 1 también se copia a semanal y mensual).

@@ -143,9 +143,16 @@ class ExportacionesDelUsuarioTest extends TestCase
         $exportacion = $this->exportacionCompleta();
         $this->get("/api/v1/exportaciones/{$exportacion->id}/descargar")->assertOk();
 
-        $usuario->rol->permisos()->detach(Permiso::query()->where(['modulo' => 'pruebas', 'accion' => 'exportar'])->value('id'));
+        // Quitar el permiso por la vía real (PATCH /roles): el servicio invalida el caché de
+        // permisos. Un detach directo sobre rol_permiso no pasa por esa invalidación y dejaría
+        // el permiso cacheado hasta su TTL, así que no es una vía válida para probar esto.
+        $this->actingAsAdmin(Empresa::find($usuario->empresa_id));
+        $this->patchJson("/api/v1/roles/{$usuario->rol_id}", [
+            'nombre' => $usuario->rol->nombre, 'permisos' => [],
+        ])->assertOk();
         $this->redis->streams = [];
 
+        $this->actingAs($usuario, 'sanctum');
         $this->getJson("/api/v1/exportaciones/{$exportacion->id}/descargar")->assertForbidden();
         $this->assertSame([], $this->redis->payloads(AuditoriaConstants::STREAM), 'Una descarga rechazada no se audita.');
     }

@@ -14,6 +14,7 @@ function usuario(overrides: Partial<User> = {}): User {
         permissions: [],
         isSuperAdmin: false,
         mustChangePassword: false,
+    permissionVersion: 1,
         ...overrides,
     };
 }

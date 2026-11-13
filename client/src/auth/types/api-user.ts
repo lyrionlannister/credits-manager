@@ -11,4 +11,5 @@ export type ApiUser = {
     activo: boolean;
     es_superadmin: boolean;
     debe_cambiar_clave: boolean;
+    version_permisos: number;
 };

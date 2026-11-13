@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useAuth } from '../hooks/use-auth';
+import { useCompany } from '../../company/hooks/use-company';
 import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
@@ -32,7 +33,8 @@ function buildBaseline(rol: ApiRoleWithPermisos | undefined, permisos: ApiPermis
 export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => {
     const navigate = useNavigate();
     const { sendRequest } = useSendRequest();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, refreshUser } = useAuth();
+    const { company } = useCompany();
     const { data: rolesData } = useResource<PaginatedResponse<ApiRoleWithPermisos>>('/roles?per_page=100');
     const { data: permisosData } = useResource<{ permisos: ApiPermisoPanelItem[] }>('/permisos');
     const roles = rolesData?.data ?? [];
@@ -47,6 +49,9 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
     const [roleId, setRoleId] = useState<number | null>(initialData?.rol?.id ?? null);
     const [overrides, setOverrides] = useState<Record<number, boolean>>({});
     const [active, setActive] = useState(initialData?.activo ?? true);
+    // Fase 2: las excepciones son temporales y visibles — motivo obligatorio y vencimiento opcional (máx. 90 días).
+    const [motivo, setMotivo] = useState(initialData?.permisos_extra[0]?.pivot.motivo ?? '');
+    const [venceEn, setVenceEn] = useState(initialData?.permisos_extra[0]?.pivot.vence_en ?? '');
     const [isGlobal, setIsGlobal] = useState(initialData?.es_asesor_global ?? false);
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,6 +136,25 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
             return;
         }
 
+        const baselineParaValidar = buildBaseline(roles.find((rol) => rol.id === roleId), permisos);
+        const hayExcepciones = permisos.some(
+            (permiso) => (overrides[permiso.id] ?? false) !== (baselineParaValidar[permiso.id] ?? false),
+        );
+
+        if (hayExcepciones && !motivo.trim()) {
+            setError('Indica el motivo de las excepciones de permisos de este usuario.');
+            return;
+        }
+
+        if (venceEn) {
+            const limite = new Date();
+            limite.setDate(limite.getDate() + 90);
+            if (new Date(`${venceEn}T00:00:00`) > limite) {
+                setError('El vencimiento de las excepciones no puede superar los 90 días.');
+                return;
+            }
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -141,7 +165,12 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
 
             const permisosExtra = permisos
                 .filter((permiso) => (overrides[permiso.id] ?? false) !== (baseline[permiso.id] ?? false))
-                .map((permiso) => ({ permiso_id: permiso.id, concedido: overrides[permiso.id] ?? false }));
+                .map((permiso) => ({
+                    permiso_id: permiso.id,
+                    concedido: overrides[permiso.id] ?? false,
+                    motivo: motivo.trim(),
+                    vence_en: venceEn || null,
+                }));
 
             if (isEditMode) {
                 await sendRequest(`/usuarios/${userId}`, {
@@ -163,6 +192,9 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
                 });
             }
 
+            // Fase 3: la sesión propia se vuelve a pedir tras guardar (por si el usuario editado es uno mismo).
+            await refreshUser();
+
             navigate('/usuarios', {
                 replace: true,
                 state: { message: isEditMode ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.' },
@@ -177,6 +209,12 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
     return (
         <form onSubmit={handleSubmit}>
             <div className="space-y-8">
+                {company && (
+                    <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/3 dark:text-gray-400">
+                        {`Los permisos y excepciones de este usuario aplican solo en ${company.name}. Si el usuario trabaja en otra empresa, tiene otra cuenta con sus propios permisos.`}
+                    </p>
+                )}
+
                 {error && (
                     <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
                         {error}
@@ -334,6 +372,46 @@ export const RegisterForm: FC<RegisterFormProps> = ({ userId, initialData }) => 
                                 </div>
                             }
                         />
+                        {tieneExcepciones && (
+                            <div className="mt-6 space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-500/10">
+                                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                    Excepciones temporales: vencen a los 30 días si no indicas fecha (máximo 90 días).
+                                </p>
+                                <div>
+                                    <Label htmlFor="motivo-excepciones">Motivo de las excepciones *</Label>
+                                    <Input
+                                        id="motivo-excepciones"
+                                        name="motivo-excepciones"
+                                        pill
+                                        value={motivo}
+                                        onChange={(event) => setMotivo(event.target.value)}
+                                        placeholder="Por qué este usuario necesita estos permisos…"
+                                    />
+                                </div>
+                                <div className="md:w-1/2">
+                                    <Label htmlFor="vence-excepciones">Vencimiento (opcional)</Label>
+                                    <Input
+                                        id="vence-excepciones"
+                                        name="vence-excepciones"
+                                        type="date"
+                                        pill
+                                        value={venceEn}
+                                        onChange={(event) => setVenceEn(event.target.value)}
+                                    />
+                                </div>
+                                {initialData && initialData.permisos_extra.length > 0 && (
+                                    <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                                        {initialData.permisos_extra.map((excepcion) => (
+                                            <li key={`${excepcion.modulo}.${excepcion.accion}`}>
+                                                {`${excepcion.modulo}.${excepcion.accion} — ${excepcion.pivot.concedido ? 'concedido' : 'revocado'}`}
+                                                {excepcion.pivot.motivo ? ` · ${excepcion.pivot.motivo}` : ''}
+                                                {excepcion.pivot.vence_en ? ` · vence ${excepcion.pivot.vence_en}` : ' · sin vencimiento'}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
                     </section>
                 </div>
 

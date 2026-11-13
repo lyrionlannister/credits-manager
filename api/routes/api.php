@@ -73,7 +73,9 @@ use App\Respaldos\Controllers\ResumenRespaldosController;
 use App\Seguridad\Controllers\AccesoController;
 use App\Seguridad\Controllers\AdminEmpresaController;
 use App\Seguridad\Controllers\SesionActivaController;
+use App\Soporte\Controllers\AccesoSoporteController;
 use App\Terceros\Controllers\TerceroController;
+use App\Usuarios\Controllers\DiagnosticoPermisoController;
 use App\Usuarios\Controllers\PermisoController;
 use App\Usuarios\Controllers\RolController;
 use App\Usuarios\Controllers\UsuarioController;
@@ -81,7 +83,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
+Route::middleware(['auth:sanctum', 'debe_cambiar_clave', 'soporte.solo_lectura'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'usuarioActual']);
     Route::patch('/me/clave', [AuthController::class, 'cambiarClave'])->middleware('throttle:cambiar-clave-propia');
@@ -149,6 +151,7 @@ Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
     Route::get('/usuarios', [UsuarioController::class, 'index'])->middleware('permiso:usuarios,listar');
     Route::post('/usuarios', [UsuarioController::class, 'store'])->middleware('permiso:usuarios,crear');
     Route::get('/usuarios/{usuario}', [UsuarioController::class, 'show'])->middleware('permiso:usuarios,editar');
+    Route::get('/usuarios/{usuario}/diagnostico-permiso', [DiagnosticoPermisoController::class, 'show'])->middleware('permiso:usuarios,listar');
     Route::patch('/usuarios/{usuario}', [UsuarioController::class, 'update'])->middleware('permiso:usuarios,editar');
     Route::patch('/usuarios/{usuario}/clave', [UsuarioController::class, 'cambiarClave'])->middleware('admin');
     Route::delete('/usuarios/{usuario}', [UsuarioController::class, 'destroy'])->middleware('permiso:usuarios,eliminar');
@@ -159,6 +162,14 @@ Route::middleware(['auth:sanctum', 'debe_cambiar_clave'])->group(function () {
     Route::patch('/roles/{rol}', [RolController::class, 'update'])->middleware('admin');
     Route::delete('/roles/{rol}', [RolController::class, 'destroy'])->middleware('admin');
     Route::get('/permisos', [PermisoController::class, 'index'])->middleware('permiso:usuarios,listar');
+
+    // Fase 4: acceso de soporte just-in-time del superadmin (una empresa, solo lectura, con vencimiento).
+    Route::get('/accesos-soporte', [AccesoSoporteController::class, 'index']);
+    Route::post('/accesos-soporte', [AccesoSoporteController::class, 'store'])->middleware('superadmin');
+    Route::post('/accesos-soporte/{acceso}/aprobar', [AccesoSoporteController::class, 'aprobar'])->middleware('admin');
+    Route::post('/accesos-soporte/{acceso}/rechazar', [AccesoSoporteController::class, 'rechazar'])->middleware('admin');
+    Route::post('/accesos-soporte/{acceso}/activar', [AccesoSoporteController::class, 'activar'])->middleware('superadmin');
+    Route::post('/accesos-soporte/{acceso}/revocar', [AccesoSoporteController::class, 'revocar']);
 
     Route::get('/clientes', [ClienteController::class, 'index'])->middleware('permiso:clientes,listar');
     Route::post('/clientes/exportar', [ClienteController::class, 'exportar'])->middleware('exportacion:clientes.listado');

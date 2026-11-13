@@ -50,7 +50,7 @@ class TrazabilidadUsuariosTest extends TestCase
 
         $id = $this->postJson('/api/v1/usuarios', [
             'nombre' => 'Nuevo Asesor', 'usuario' => 'nuevo_asesor', 'clave' => 'Clave123!', 'rol_id' => $rol->id, 'activo' => true,
-            'permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => true]],
+            'permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => true, 'motivo' => 'Motivo de prueba']],
         ])->assertCreated()->json('usuario.id');
 
         $evento = $this->assertEventoAuditoria('crear', 'usuarios', 'usuario', $id);
@@ -94,7 +94,7 @@ class TrazabilidadUsuariosTest extends TestCase
 
         $this->patchJson("/api/v1/usuarios/{$usuario->id}", $this->payloadEdicion($usuario, [
             'rol_id' => $rolNuevo->id,
-            'permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => false]],
+            'permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => false, 'motivo' => 'Motivo de prueba']],
         ]))->assertOk();
 
         $evento = $this->assertEventoAuditoria('cambio_permisos', 'usuarios', 'usuario', $usuario->id);
@@ -108,7 +108,7 @@ class TrazabilidadUsuariosTest extends TestCase
         $rol = Rol::create(['nombre' => 'asesor_test']);
         $usuario = $this->usuarioExistente($rol);
         $permiso = $this->permiso('gastos', 'crear');
-        $payload = $this->payloadEdicion($usuario, ['permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => true]]]);
+        $payload = $this->payloadEdicion($usuario, ['permisos_extra' => [['permiso_id' => $permiso->id, 'concedido' => true, 'motivo' => 'Motivo de prueba']]]);
 
         $this->patchJson("/api/v1/usuarios/{$usuario->id}", $payload)->assertOk();
         $this->patchJson("/api/v1/usuarios/{$usuario->id}", [...$payload, 'nombre' => 'Otro nombre'])->assertOk();

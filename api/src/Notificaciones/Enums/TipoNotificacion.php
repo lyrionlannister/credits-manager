@@ -15,4 +15,8 @@ enum TipoNotificacion: string
     case ExtractoBancarioCargado = 'extracto_bancario_cargado';
     case ExtractoBancarioRechazado = 'extracto_bancario_rechazado';
     case ObligacionTributariaPorVencer = 'obligacion_tributaria_por_vencer';
+    case AccesoSoporteSolicitado = 'acceso_soporte_solicitado';
+    case AccesoSoporteAprobado = 'acceso_soporte_aprobado';
+    case AccesoSoporteRechazado = 'acceso_soporte_rechazado';
+    case AccesoSoporteRevocado = 'acceso_soporte_revocado';
 }

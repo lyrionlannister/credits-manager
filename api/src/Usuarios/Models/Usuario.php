@@ -5,6 +5,7 @@ namespace App\Usuarios\Models;
 use App\Core\Base\BaseModel;
 use App\Core\Concerns\PerteneceAEmpresa;
 use App\Usuarios\Constants\UsuarioConstants;
+use App\Usuarios\Services\PermisoCache;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -46,12 +47,47 @@ class Usuario extends BaseModel implements AuthenticatableContract
         return $this->belongsTo(Rol::class);
     }
 
-    /** Excepciones puntuales sobre el permiso que da el rol: conceden o revocan un permiso específico. */
+    /**
+     * Excepciones puntuales sobre el permiso que da el rol: conceden o revocan un permiso específico. Solo se leen las de la empresa del usuario: una excepción de otra empresa nunca se hereda.
+     *
+     * El filtro por empresa solo se aplica si el modelo existe: en eager loading (`with`/`load`) Eloquent
+     * construye esta relación sobre una instancia vacía (sin empresa_id) para armar la consulta plantilla
+     * y luego la restringe por `usuario_id`; aplicar el filtro ahí dejaría la consulta sin resultados.
+     * Como cada usuario_id ya pertenece a una sola empresa, el filtro es defensa en profundidad, no la
+     * restricción real.
+     */
     public function permisosExtra(): BelongsToMany
     {
-        return $this->belongsToMany(Permiso::class, 'usuario_permiso')
+        $relacion = $this->belongsToMany(Permiso::class, 'usuario_permiso')
             ->using(UsuarioPermiso::class)
-            ->withPivot(['concedido']);
+            ->withPivot(['concedido', 'empresa_id', 'motivo', 'responsable_id', 'vence_en']);
+
+        if ($this->exists) {
+            $relacion->wherePivot('empresa_id', $this->empresa_id);
+        }
+
+        return $relacion;
+    }
+
+    /** Solo las excepciones vigentes: sin vencimiento (pendientes de regularizar) o con vence_en en el futuro. Una vencida deja de aplicar y el rol vuelve a mandar. */
+    public function permisosExtraVigentes(): BelongsToMany
+    {
+        return $this->permisosExtra()
+            ->where(function ($consulta) {
+                $consulta->whereNull('usuario_permiso.vence_en')
+                    ->orWhere('usuario_permiso.vence_en', '>', now());
+            });
+    }
+
+    /** Restricción reutilizable para cargar `permisosExtra` solo con las vigentes (p. ej. en /me). */
+    public static function soloVigentes(): \Closure
+    {
+        return function ($relacion) {
+            $relacion->where(function ($consulta) {
+                $consulta->whereNull('usuario_permiso.vence_en')
+                    ->orWhere('usuario_permiso.vence_en', '>', now());
+            });
+        };
     }
 
     /**
@@ -88,19 +124,19 @@ class Usuario extends BaseModel implements AuthenticatableContract
             return true;
         }
 
-        $excepcion = $this->permisosExtra()
-            ->where('modulo', $modulo)
-            ->where('accion', $accion)
-            ->first();
+        // Fase 9: el permiso efectivo sale del caché por (usuario, empresa); si Redis cae, el
+        // caché calcula contra la base de datos. La excepción vigente siempre gana sobre el rol.
+        return in_array("{$modulo}.{$accion}", app(PermisoCache::class)->efectivos($this), true);
+    }
 
-        if ($excepcion) {
-            return (bool) $excepcion->pivot->concedido;
+    /** @return list<string> permisos efectivos "modulo.accion" de este usuario en su empresa */
+    public function permisosEfectivos(): array
+    {
+        if ($this->rol?->nombre === UsuarioConstants::ROL_ADMIN) {
+            return ['*'];
         }
 
-        return (bool) $this->rol?->permisos()
-            ->where('modulo', $modulo)
-            ->where('accion', $accion)
-            ->exists();
+        return app(PermisoCache::class)->efectivos($this);
     }
 
     protected function casts(): array
@@ -110,6 +146,7 @@ class Usuario extends BaseModel implements AuthenticatableContract
             'activo' => 'boolean',
             'debe_cambiar_clave' => 'boolean',
             'es_asesor_global' => 'boolean',
+            'version_permisos' => 'integer',
         ];
     }
 }

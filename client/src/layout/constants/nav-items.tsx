@@ -49,6 +49,7 @@ import {
     GitCompare,
 } from "lucide-react";
 import { canAccessAudit } from "../../auth/utils/can-access-audit";
+import { isCompanyAdmin } from "../../auth/utils/is-company-admin";
 import { hasAnyPermission } from "../../auth/utils/has-any-permission";
 import { IMPORT_PERMISSIONS } from "../../imports/constants/import-types";
 import type { NavItem } from "../types/nav-item";
@@ -66,6 +67,7 @@ export const SUPERADMIN_NAV_ITEMS: NavItem[] = [
             { name: "Sesiones", path: "/seguridad/sesiones", icon: MonitorSmartphone },
             { name: "Accesos", path: "/seguridad/accesos", icon: KeyRound },
             { name: "Administradores", path: "/seguridad/admins-empresa", icon: UserCog },
+            { name: "Acceso de soporte", path: "/seguridad/acceso-soporte", icon: ShieldUser },
         ],
     },
     { name: "Respaldos", icon: DatabaseBackup, path: "/respaldos" },
@@ -84,6 +86,12 @@ export const NAV_ITEMS: NavItem[] = [
                 path: "/auditoria",
                 icon: ScrollText,
                 isVisible: (user) => canAccessAudit(user, "listar"),
+            },
+            {
+                name: "Acceso de soporte",
+                path: "/seguridad/acceso-soporte",
+                icon: ShieldUser,
+                isVisible: (user) => isCompanyAdmin(user),
             },
         ],
     },
