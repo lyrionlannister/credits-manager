@@ -5,6 +5,7 @@ namespace Tests\Feature\Usuarios;
 use App\Usuarios\Models\Permiso;
 use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
+use App\Usuarios\Repositories\UsuarioRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\ActsAsAdmin;
@@ -84,7 +85,7 @@ class ExcepcionesPorEmpresaTest extends TestCase
             'concedido' => true,
         ]);
 
-        app(\App\Usuarios\Repositories\UsuarioRepository::class)->sincronizarPermisosExtra($usuario, []);
+        app(UsuarioRepository::class)->sincronizarPermisosExtra($usuario, []);
 
         $this->assertDatabaseHas('usuario_permiso', [
             'usuario_id' => $usuario->id,
@@ -99,7 +100,7 @@ class ExcepcionesPorEmpresaTest extends TestCase
         $usuario = $this->crearUsuarioConRol([]);
         $permiso = Permiso::create(['modulo' => 'clientes', 'accion' => 'crear']);
 
-        app(\App\Usuarios\Repositories\UsuarioRepository::class)->sincronizarPermisosExtra($usuario, [
+        app(UsuarioRepository::class)->sincronizarPermisosExtra($usuario, [
             $permiso->id => ['concedido' => true],
         ]);
 

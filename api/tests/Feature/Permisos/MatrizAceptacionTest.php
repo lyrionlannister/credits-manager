@@ -6,6 +6,7 @@ use App\Usuarios\Models\Permiso;
 use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\CreatesAuditoriaFixtures;
 use Tests\TestCase;
@@ -108,7 +109,7 @@ class MatrizAceptacionTest extends TestCase
 
         // Al vencer, vuelve a mandar el rol (que no lo tiene): deniega sin más cambios.
         $this->usuario->permisosExtra()->updateExistingPivot($permiso->id, ['vence_en' => now()->subDay()]);
-        \Illuminate\Support\Facades\Artisan::call('permisos:vencer-excepciones');
+        Artisan::call('permisos:vencer-excepciones');
 
         $this->getJson('/api/v1/empleadores')->assertForbidden();
     }

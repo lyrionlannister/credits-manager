@@ -24,12 +24,12 @@ class CoherenciaCatalogoTest extends TestCase
         $rutas = file_get_contents(base_path('routes/api.php'));
         $permisos = [];
 
-        preg_match_all("/(?:permiso|permiso_o_superadmin):([a-z0-9_]+),([a-z0-9_]+)/", $rutas, $simples);
+        preg_match_all('/(?:permiso|permiso_o_superadmin):([a-z0-9_]+),([a-z0-9_]+)/', $rutas, $simples);
         foreach ($simples[1] as $i => $modulo) {
             $permisos[] = "{$modulo}.{$simples[2][$i]}";
         }
 
-        preg_match_all("/algun_permiso:([a-z0-9_.,]+)/", $rutas, $multiples);
+        preg_match_all('/algun_permiso:([a-z0-9_.,]+)/', $rutas, $multiples);
         foreach ($multiples[1] as $lista) {
             foreach (explode(',', $lista) as $clave) {
                 $permisos[] = trim($clave);

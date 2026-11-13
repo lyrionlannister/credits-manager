@@ -8,7 +8,6 @@ use App\Auditoria\Services\EmisorAuditoria;
 use App\Usuarios\Constants\UsuarioConstants;
 use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
-use App\Usuarios\Services\PermisoCache;
 use App\Usuarios\Repositories\RolRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;

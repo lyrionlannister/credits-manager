@@ -7,7 +7,6 @@ use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
 use App\Usuarios\Services\VencimientoExcepcionesService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\TestCase;

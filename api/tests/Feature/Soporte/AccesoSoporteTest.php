@@ -4,6 +4,7 @@ namespace Tests\Feature\Soporte;
 
 use App\Empresas\Models\Empresa;
 use App\Soporte\Models\AccesoSoporte;
+use App\Usuarios\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\Concerns\ActsAsAdmin;
@@ -24,9 +25,9 @@ class AccesoSoporteTest extends TestCase
 
     private Empresa $empresa;
 
-    private \App\Usuarios\Models\Usuario $admin;
+    private Usuario $admin;
 
-    private \App\Usuarios\Models\Usuario $superadmin;
+    private Usuario $superadmin;
 
     protected function setUp(): void
     {

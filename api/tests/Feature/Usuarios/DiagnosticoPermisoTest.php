@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Usuarios;
 
+use App\Empresas\Models\Empresa;
 use App\Usuarios\Models\Permiso;
 use App\Usuarios\Models\Rol;
 use App\Usuarios\Models\Usuario;
@@ -20,7 +21,7 @@ class DiagnosticoPermisoTest extends TestCase
     use CreatesAuditoriaFixtures;
     use RefreshDatabase;
 
-    private function crearUsuarioConRol(array $permisosDelRol, ?string $nombreRol = null, ?\App\Empresas\Models\Empresa $empresa = null): Usuario
+    private function crearUsuarioConRol(array $permisosDelRol, ?string $nombreRol = null, ?Empresa $empresa = null): Usuario
     {
         $empresa ??= $this->crearEmpresaDePrueba();
 
@@ -82,7 +83,7 @@ class DiagnosticoPermisoTest extends TestCase
     public function test_el_endpoint_de_diagnostico_responde_solo_a_admin_y_el_403_lleva_motivo(): void
     {
         $admin = $this->actingAsAdmin();
-        $empresa = \App\Empresas\Models\Empresa::findOrFail($admin->empresa_id);
+        $empresa = Empresa::findOrFail($admin->empresa_id);
         $usuario = $this->crearUsuarioConRol([['clientes', 'crear']], null, $empresa);
         // El permiso que protege el endpoint existe en el catálogo: la causa es no tenerlo, no su ausencia.
         Permiso::firstOrCreate(['modulo' => 'usuarios', 'accion' => 'listar']);
@@ -102,7 +103,7 @@ class DiagnosticoPermisoTest extends TestCase
     public function test_un_intento_rechazado_por_anti_escalada_queda_en_la_bitacora(): void
     {
         $admin = $this->actingAsAdmin();
-        $empresa = \App\Empresas\Models\Empresa::findOrFail($admin->empresa_id);
+        $empresa = Empresa::findOrFail($admin->empresa_id);
         $rolAsesor = Rol::create(['empresa_id' => $empresa->id, 'nombre' => 'asesor_test_'.uniqid()]);
         $ajeno = Permiso::create(['modulo' => 'creditos', 'accion' => 'aprobar']);
 

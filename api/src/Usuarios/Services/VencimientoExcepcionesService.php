@@ -5,10 +5,7 @@ namespace App\Usuarios\Services;
 use App\Auditoria\Constants\AuditoriaConstants;
 use App\Auditoria\Enums\AccionAuditoria;
 use App\Auditoria\Services\EmisorAuditoria;
-use App\Usuarios\Constants\PermisoCacheConstants;
 use App\Usuarios\Models\Usuario;
-use App\Usuarios\Services\PermisoCache;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**

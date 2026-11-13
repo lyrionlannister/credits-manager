@@ -71,13 +71,13 @@ use App\Respaldos\Controllers\ConfiguracionRespaldoExternoController;
 use App\Respaldos\Controllers\DescargaBaseController;
 use App\Respaldos\Controllers\ResumenRespaldosController;
 use App\Seguridad\Controllers\AccesoController;
-use App\Soporte\Controllers\AccesoSoporteController;
 use App\Seguridad\Controllers\AdminEmpresaController;
 use App\Seguridad\Controllers\SesionActivaController;
+use App\Soporte\Controllers\AccesoSoporteController;
 use App\Terceros\Controllers\TerceroController;
+use App\Usuarios\Controllers\DiagnosticoPermisoController;
 use App\Usuarios\Controllers\PermisoController;
 use App\Usuarios\Controllers\RolController;
-use App\Usuarios\Controllers\DiagnosticoPermisoController;
 use App\Usuarios\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
