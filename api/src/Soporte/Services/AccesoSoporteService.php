@@ -11,6 +11,7 @@ use App\Notificaciones\Services\NotificacionService;
 use App\Soporte\Enums\EstadoAccesoSoporte;
 use App\Soporte\Models\AccesoSoporte;
 use App\Usuarios\Models\Usuario;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -287,7 +288,7 @@ class AccesoSoporteService
         }
     }
 
-    /** @return \Illuminate\Support\Collection<int, Usuario> */
+    /** @return Collection<int, Usuario> */
     private function administradoresDe(int $empresaId)
     {
         return Usuario::query()
