@@ -47,13 +47,26 @@ class Usuario extends BaseModel implements AuthenticatableContract
         return $this->belongsTo(Rol::class);
     }
 
-    /** Excepciones puntuales sobre el permiso que da el rol: conceden o revocan un permiso específico. Solo se leen las de la empresa del usuario: una excepción de otra empresa nunca se hereda. */
+    /**
+     * Excepciones puntuales sobre el permiso que da el rol: conceden o revocan un permiso específico. Solo se leen las de la empresa del usuario: una excepción de otra empresa nunca se hereda.
+     *
+     * El filtro por empresa solo se aplica si el modelo existe: en eager loading (`with`/`load`) Eloquent
+     * construye esta relación sobre una instancia vacía (sin empresa_id) para armar la consulta plantilla
+     * y luego la restringe por `usuario_id`; aplicar el filtro ahí dejaría la consulta sin resultados.
+     * Como cada usuario_id ya pertenece a una sola empresa, el filtro es defensa en profundidad, no la
+     * restricción real.
+     */
     public function permisosExtra(): BelongsToMany
     {
-        return $this->belongsToMany(Permiso::class, 'usuario_permiso')
+        $relacion = $this->belongsToMany(Permiso::class, 'usuario_permiso')
             ->using(UsuarioPermiso::class)
-            ->wherePivot('empresa_id', $this->empresa_id)
             ->withPivot(['concedido', 'empresa_id', 'motivo', 'responsable_id', 'vence_en']);
+
+        if ($this->exists) {
+            $relacion->wherePivot('empresa_id', $this->empresa_id);
+        }
+
+        return $relacion;
     }
 
     /** Solo las excepciones vigentes: sin vencimiento (pendientes de regularizar) o con vence_en en el futuro. Una vencida deja de aplicar y el rol vuelve a mandar. */

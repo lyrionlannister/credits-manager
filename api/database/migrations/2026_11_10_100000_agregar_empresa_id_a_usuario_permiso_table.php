@@ -35,17 +35,18 @@ return new class extends Migration
             }, 'usuario_permiso.id');
 
         Schema::table('usuario_permiso', function (Blueprint $table) {
-            $table->dropUnique(['usuario_id', 'permiso_id']);
             $table->unique(['usuario_id', 'empresa_id', 'permiso_id']);
+            $table->dropUnique(['usuario_id', 'permiso_id']);
         });
     }
 
     public function down(): void
     {
         Schema::table('usuario_permiso', function (Blueprint $table) {
-            $table->dropUnique(['usuario_id', 'empresa_id', 'permiso_id']);
-            $table->dropColumn('empresa_id');
             $table->unique(['usuario_id', 'permiso_id']);
+            $table->dropUnique(['usuario_id', 'empresa_id', 'permiso_id']);
+            $table->dropForeign(['empresa_id']);
+            $table->dropColumn('empresa_id');
         });
     }
 };
