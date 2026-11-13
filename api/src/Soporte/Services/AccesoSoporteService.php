@@ -28,20 +28,12 @@ class AccesoSoporteService
 
     public const DURACION_POR_DEFECTO_MINUTOS = 30;
 
-    /** Caché por petición del acceso activo, para no consultar la tabla en cada modelo con scope. */
-    private static array $activosPorUsuario = [];
-
     public function __construct(
         protected EmisorAuditoria $auditoria,
         protected NotificacionService $notificaciones,
     ) {}
 
-    public static function limpiarCachePeticion(): void
-    {
-        self::$activosPorUsuario = [];
-    }
-
-    /** El acceso activo de un superadmin, si lo tiene y no venció; al vencer se marca expirado. */
+    /** El acceso activo de un superadmin, si lo tiene y no venció; al vencer se marca expirado. Siempre consulta la BD: un caché en memoria de proceso sobrevive entre peticiones distintas en el mismo worker de PHP-FPM y dejaría ver un acceso ya revocado por otro worker. */
     public function accesoActivo(Usuario $usuario): ?AccesoSoporte
     {
         // Sin el accesor `es_superadmin`: se lee desde EmpresaScope, donde el accesor estaría reentrando.
@@ -49,14 +41,8 @@ class AccesoSoporteService
             return null;
         }
 
-        $clave = (int) $usuario->id;
-
-        if (array_key_exists($clave, self::$activosPorUsuario)) {
-            return self::$activosPorUsuario[$clave];
-        }
-
         $acceso = AccesoSoporte::query()
-            ->where('superadmin_id', $clave)
+            ->where('superadmin_id', (int) $usuario->id)
             ->where('estado', EstadoAccesoSoporte::Activo)
             ->orderByDesc('activado_en')
             ->first();
@@ -66,7 +52,7 @@ class AccesoSoporteService
             $acceso = null;
         }
 
-        return self::$activosPorUsuario[$clave] = $acceso;
+        return $acceso;
     }
 
     public function solicitar(Usuario $superadmin, int $empresaId, string $motivo, int $duracionMinutos = self::DURACION_POR_DEFECTO_MINUTOS): AccesoSoporte
@@ -208,7 +194,6 @@ class AccesoSoporteService
             'activado_en' => now(),
             'expira_en' => now()->addMinutes($acceso->duracion_minutos),
         ]);
-        self::$activosPorUsuario[(int) $superadmin->id] = $acceso->fresh();
 
         $this->auditoria->registrar(
             AccionAuditoria::Modificar,
@@ -237,7 +222,6 @@ class AccesoSoporteService
         }
 
         $acceso->update(['estado' => EstadoAccesoSoporte::Revocado, 'revocado_en' => now()]);
-        unset(self::$activosPorUsuario[(int) $acceso->superadmin_id]);
 
         $this->auditoria->registrar(
             AccionAuditoria::Cancelar,
@@ -281,7 +265,6 @@ class AccesoSoporteService
     private function marcarExpirado(AccesoSoporte $acceso): void
     {
         $acceso->update(['estado' => EstadoAccesoSoporte::Expirado]);
-        unset(self::$activosPorUsuario[(int) $acceso->superadmin_id]);
 
         $this->auditoria->registrar(
             AccionAuditoria::Cancelar,
