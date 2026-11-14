@@ -22,12 +22,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('usuario_permiso', function (Blueprint $table) {
-            $table->string('motivo', 500)->nullable()->after('concedido');
-            $table->foreignId('responsable_id')->nullable()->after('motivo')
-                ->constrained('usuarios')->nullOnDelete();
-            $table->timestamp('vence_en')->nullable()->after('responsable_id');
-        });
+        if (! Schema::hasColumn('usuario_permiso', 'motivo')) {
+            Schema::table('usuario_permiso', function (Blueprint $table) {
+                $table->string('motivo', 500)->nullable()->after('concedido');
+                $table->foreignId('responsable_id')->nullable()->after('motivo')
+                    ->constrained('usuarios')->nullOnDelete();
+                $table->timestamp('vence_en')->nullable()->after('responsable_id');
+            });
+        }
 
         // En PHP (no en SQL crudo) para que funcione igual en MySQL y en SQLite.
         DB::table('usuario_permiso')
@@ -41,7 +43,7 @@ return new class extends Migration
                         'vence_en' => Carbon::parse($base)->addDays(30),
                     ]);
                 }
-            }, 'usuario_permiso.id');
+            }, 'usuario_permiso.id', 'id');
     }
 
     public function down(): void
