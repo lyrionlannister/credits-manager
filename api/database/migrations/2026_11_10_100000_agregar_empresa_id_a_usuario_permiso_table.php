@@ -19,10 +19,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('usuario_permiso', function (Blueprint $table) {
-            $table->foreignId('empresa_id')->nullable()->after('usuario_id')
-                ->constrained('empresas')->cascadeOnDelete();
-        });
+        if (! Schema::hasColumn('usuario_permiso', 'empresa_id')) {
+            Schema::table('usuario_permiso', function (Blueprint $table) {
+                $table->foreignId('empresa_id')->nullable()->after('usuario_id')
+                    ->constrained('empresas')->cascadeOnDelete();
+            });
+        }
 
         DB::table('usuario_permiso')
             ->join('usuarios', 'usuarios.id', '=', 'usuario_permiso.usuario_id')
