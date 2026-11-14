@@ -5,8 +5,8 @@ namespace Tests\Feature\Creditos;
 use App\Contabilidad\Enums\EstadoComprobante;
 use App\Contabilidad\Enums\EventoContable;
 use App\Creditos\Enums\EstadoCredito;
-use App\Pagos\Enums\FormaPago;
-use App\Pagos\Models\Pago;
+use App\Creditos\Enums\TipoReprogramacion;
+use App\Creditos\Repositories\ReprogramacionCreditoRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\CreatesContabilidadFixtures;
@@ -34,22 +34,55 @@ class EliminarCreditoTest extends TestCase
         $this->assertSoftDeleted('cuotas', ['id' => $cuota->id]);
     }
 
-    public function test_rechaza_eliminar_credito_con_pagos_registrados(): void
+    /**
+     * Un crédito con pagos ya no es intocable: eliminar los reversa todos (movimiento compensatorio, nunca se
+     * editan ni se borran) y después el comprobante de desembolso, antes de borrar el crédito lógicamente.
+     */
+    public function test_elimina_un_credito_desembolsado_con_pagos_reversandolos_todos(): void
     {
         $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
         $cliente = $this->crearCliente();
-        $credito = $this->crearCredito($cliente);
-        Pago::create([
+        $credito = $this->crearCredito($cliente, ['estado' => EstadoCredito::Aprobado]);
+        $this->postJson("/api/v1/creditos/{$credito->id}/desembolsar")->assertOk();
+        $cuota = $this->crearCuota($credito, ['valor' => 300, 'valor_capital' => 300, 'fecha_vencimiento' => now()->addMonth()->toDateString()]);
+
+        $pagoId = $this->postJson("/api/v1/creditos/{$credito->id}/pagos", ['valor_pago' => 100, 'forma_pago' => 'efectivo'])
+            ->assertCreated()->json('pago.id');
+
+        $respuesta = $this->deleteJson("/api/v1/creditos/{$credito->id}");
+
+        $respuesta->assertStatus(204);
+        $this->assertSoftDeleted('creditos', ['id' => $credito->id]);
+        $this->assertSoftDeleted('cuotas', ['id' => $cuota->id]);
+        $this->assertDatabaseHas('reversas_pago', ['pago_id' => $pagoId]);
+        $this->assertDatabaseHas('pagos', ['id' => $pagoId]); // el pago nunca se edita ni se borra, solo se reversa.
+        $this->assertDatabaseHas('comprobantes', [
+            'modulo_origen' => 'creditos', 'origen_id' => $credito->id, 'estado' => EstadoComprobante::Anulado->value,
+        ]);
+    }
+
+    public function test_rechaza_eliminar_credito_con_pago_no_reversable(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $cliente = $this->crearCliente();
+        $credito = $this->crearCredito($cliente, ['estado' => EstadoCredito::Aprobado]);
+        $this->postJson("/api/v1/creditos/{$credito->id}/desembolsar")->assertOk();
+        $this->crearCuota($credito, ['valor' => 300, 'valor_capital' => 300, 'fecha_vencimiento' => now()->addMonth()->toDateString()]);
+        $this->postJson("/api/v1/creditos/{$credito->id}/pagos", ['valor_pago' => 100, 'forma_pago' => 'efectivo'])->assertCreated();
+
+        app(ReprogramacionCreditoRepository::class)->crear([
             'credito_id' => $credito->id,
-            'cliente_id' => $cliente->id,
-            'valor_pago' => 100,
-            'fecha_pago' => now(),
-            'forma_pago' => FormaPago::Efectivo,
+            'tipo' => TipoReprogramacion::Reprogramacion,
+            'motivo' => 'Reprogramación posterior al pago',
+            'plan_anterior' => [],
+            'creado_por' => null,
         ]);
 
         $respuesta = $this->deleteJson("/api/v1/creditos/{$credito->id}");
 
-        $respuesta->assertStatus(422)->assertJsonValidationErrors('credito');
+        $respuesta->assertStatus(422)->assertJsonValidationErrors('pago');
         $this->assertDatabaseHas('creditos', ['id' => $credito->id, 'borrado_en' => null]);
     }
 

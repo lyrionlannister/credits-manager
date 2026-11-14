@@ -359,7 +359,6 @@ return [
             'tiene_creditos_activos' => 'No se puede eliminar un cliente con créditos activos (no pagados ni cancelados).',
         ],
         'credito' => [
-            'tiene_pagos_registrados' => 'No se puede eliminar un crédito con pagos registrados.',
             'cancelacion_con_pagos' => 'No se puede cancelar un crédito con pagos registrados.',
             'refinanciado_no_eliminable' => 'No se puede eliminar un crédito refinanciado: es el historial del crédito que lo reemplazó.',
             'no_editable' => 'Solo se pueden modificar las condiciones de un crédito solicitado o aprobado. Después del desembolso, la corrección se hace refinanciando.',

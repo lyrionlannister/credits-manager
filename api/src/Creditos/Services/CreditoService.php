@@ -19,6 +19,7 @@ use App\Creditos\Repositories\ReprogramacionCreditoRepository;
 use App\Exportacion\Enums\FormatoExportacion;
 use App\Exportacion\Models\Exportacion;
 use App\Exportacion\Services\ExportacionService;
+use App\Pagos\Services\PagoService;
 use App\Usuarios\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,6 +38,7 @@ class CreditoService
         protected ExportacionService $exportaciones,
         protected PlanCuotasService $planCuotas,
         protected ReprogramacionCreditoRepository $reprogramaciones,
+        protected PagoService $pagoService,
     ) {}
 
     /**
@@ -570,27 +572,29 @@ class CreditoService
     }
 
     /**
-     * Soft delete — nunca hard delete de un registro de negocio. Se bloquea si el
-     * crédito ya tiene pagos registrados (igual que `ClienteService::eliminar()`
-     * bloquea por créditos activos): un crédito con historial de pagos es un hecho
-     * financiero real, no un error a "deshacer". Si estaba desembolsado, reversa su
-     * comprobante por la misma razón que `cancelar()`.
+     * Soft delete — nunca hard delete de un registro de negocio. Un crédito con pagos no es intocable: se
+     * reversan todos (el más reciente primero, con el mismo movimiento compensatorio que una reversa manual —
+     * los pagos y sus comprobantes quedan en la bitácora, nunca se editan ni se borran) y luego, si estaba
+     * desembolsado, su propio comprobante de desembolso, igual que hace `cancelar()`. Si algún pago no se puede
+     * reversar (interés ya facturado, reprogramación posterior), esa validación aborta todo: nada queda a medias.
      */
     public function eliminar(Credito $credito): bool
     {
         return DB::transaction(function () use ($credito) {
+            $credito = $this->creditos->bloquear($credito->id);
+
             if ($credito->estado === EstadoCredito::Refinanciado) {
                 throw ValidationException::withMessages(['credito' => __('validation.custom.credito.refinanciado_no_eliminable')]);
             }
 
             $this->exigirNoSerRefinanciacionDesembolsada($credito);
 
-            if ($credito->pagos()->exists()) {
-                throw ValidationException::withMessages(['credito' => __('validation.custom.credito.tiene_pagos_registrados')]);
-            }
+            $motivo = 'Eliminación del crédito #'.$credito->id;
+            $this->pagoService->reversarTodos($credito, $motivo, Auth::id());
+            $credito->refresh();
 
             if ($credito->estado === EstadoCredito::Desembolsado) {
-                $this->reversarDesembolsoSiExiste($credito, 'Eliminación del crédito #'.$credito->id);
+                $this->reversarDesembolsoSiExiste($credito, $motivo);
             }
 
             $this->cuotas->eliminarTodasDeCredito($credito->id);
