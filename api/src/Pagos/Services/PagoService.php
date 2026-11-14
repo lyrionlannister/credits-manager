@@ -170,6 +170,24 @@ class PagoService
     }
 
     /**
+     * Reversa, del más reciente al más antiguo, todos los pagos vigentes del crédito. La usa
+     * `CreditoService::eliminar()` para poder borrar (lógicamente) un crédito desembolsado con pagos: nunca deja un
+     * pago o un comprobante contabilizado sueltos de un crédito que ya no existe. Si algún pago no se puede reversar
+     * (interés ya facturado, reprogramación posterior), esa `ValidationException` sube tal cual y nada se borra.
+     */
+    public function reversarTodos(Credito $credito, string $motivo, ?int $usuarioId): int
+    {
+        $reversados = 0;
+
+        while ($pago = $this->pagos->ultimoVigenteDelCredito($credito->id)) {
+            $this->reversar($pago, $motivo, $usuarioId);
+            $reversados++;
+        }
+
+        return $reversados;
+    }
+
+    /**
      * Aplica el pago a lo exigible a la fecha del pago (cuotas vencidas y la cuota en curso), de la más antigua a la
      * más reciente. Lo que exceda se abona a capital: las cuotas siguientes se rehacen con el mismo plazo y una cuota
      * menor. Un pago que supera incluso todo el capital pendiente se rechaza; no se descarta nada en silencio.

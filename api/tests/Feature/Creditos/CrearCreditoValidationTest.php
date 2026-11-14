@@ -35,7 +35,11 @@ class CrearCreditoValidationTest extends TestCase
         $payload = $this->payloadValido($clienteId);
         unset($payload['valor_prestamo']);
 
-        return array_merge($payload, ['tipo_credito' => TipoCredito::Refinanciacion->value, 'valor_adicional' => 500000], $cambios);
+        return array_merge($payload, [
+            'tipo_credito' => TipoCredito::Refinanciacion->value,
+            'valor_adicional' => 500000,
+            'saldo_refinanciado_previsualizado' => 0,
+        ], $cambios);
     }
 
     public function test_rechaza_cliente_inexistente(): void
@@ -188,7 +192,10 @@ class CrearCreditoValidationTest extends TestCase
         $cliente = $this->crearCliente();
         $origen = $this->crearCredito($cliente);
 
-        $respuesta = $this->postJson('/api/v1/creditos', $this->payloadRefinanciacion($cliente->id, ['credito_origen_id' => $origen->id]));
+        $respuesta = $this->postJson('/api/v1/creditos', $this->payloadRefinanciacion($cliente->id, [
+            'credito_origen_id' => $origen->id,
+            'saldo_refinanciado_previsualizado' => 900, // capital pendiente del origen: sin cuotas ni pagos, es su valor_prestamo completo.
+        ]));
 
         $respuesta->assertStatus(201);
         $this->assertSame('desembolsado', $origen->fresh()->estado->value, 'El original se congela al desembolsar la refinanciación, no al solicitarla.');

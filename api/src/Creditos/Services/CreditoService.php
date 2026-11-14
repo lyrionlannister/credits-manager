@@ -19,6 +19,7 @@ use App\Creditos\Repositories\ReprogramacionCreditoRepository;
 use App\Exportacion\Enums\FormatoExportacion;
 use App\Exportacion\Models\Exportacion;
 use App\Exportacion\Services\ExportacionService;
+use App\Pagos\Services\PagoService;
 use App\Usuarios\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,6 +38,7 @@ class CreditoService
         protected ExportacionService $exportaciones,
         protected PlanCuotasService $planCuotas,
         protected ReprogramacionCreditoRepository $reprogramaciones,
+        protected PagoService $pagoService,
     ) {}
 
     /**
@@ -81,7 +83,10 @@ class CreditoService
                 $tasa,
                 $fechas,
                 (int) $this->cuotas->todasPorCredito($credito->id)->max('numero_cuota') + 1,
-                OtrosGastosCalculator::valorPorCuota($this->cuotaService->capitalPendiente($credito), (float) $credito->gastos_administracion_pct),
+                // Misma base que `conOtrosGastos()`, `actualizarGastosAdministracion()` y el accessor `valorCuotaTotal`
+                // del modelo: el valor prestado original, nunca el saldo pendiente (si no, el total del crédito que
+                // se muestra deja de coincidir con lo que quedó guardado en las cuotas nuevas).
+                OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, (float) $credito->gastos_administracion_pct),
             );
             $this->planCuotas->recalcularSaldoCapital($credito);
             $credito = $this->planCuotas->actualizarTotalesDelCredito($credito, $calculo['valor_cuota'], $tasa);
@@ -144,6 +149,7 @@ class CreditoService
     {
         return DB::transaction(function () use ($datos) {
             [$valorPrestamo, $saldoTomado] = $this->valorDelPrestamo($datos);
+            $this->exigirSaldoRefinanciadoVigente($datos, $saldoTomado);
             $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? 0);
 
             $credito = $this->creditos->crear([
@@ -359,6 +365,22 @@ class CreditoService
     }
 
     /**
+     * El saldo que el usuario vio y aprobó al previsualizar debe seguir vigente: si el original recibió un pago
+     * entre la previsualización y esta creación, el saldo a refinanciar ya cambió y la refinanciación no se crea
+     * con cifras distintas de las que el usuario confirmó.
+     */
+    private function exigirSaldoRefinanciadoVigente(array $datos, ?Dinero $saldoTomado): void
+    {
+        if ($saldoTomado === null) {
+            return;
+        }
+
+        if (! $saldoTomado->igualA(Dinero::desdePesos($datos['saldo_refinanciado_previsualizado']))) {
+            throw ValidationException::withMessages(['credito_origen_id' => __('validation.custom.credito_origen_id.saldo_cambio_desde_previsualizacion')]);
+        }
+    }
+
+    /**
      * Vínculo entre el crédito original y su refinanciación, visible desde ambos lados en el
      * detalle y en el estado de cuenta. Requiere `obtenerConRelaciones` (usa las relaciones ya cargadas).
      *
@@ -550,27 +572,29 @@ class CreditoService
     }
 
     /**
-     * Soft delete — nunca hard delete de un registro de negocio. Se bloquea si el
-     * crédito ya tiene pagos registrados (igual que `ClienteService::eliminar()`
-     * bloquea por créditos activos): un crédito con historial de pagos es un hecho
-     * financiero real, no un error a "deshacer". Si estaba desembolsado, reversa su
-     * comprobante por la misma razón que `cancelar()`.
+     * Soft delete — nunca hard delete de un registro de negocio. Un crédito con pagos no es intocable: se
+     * reversan todos (el más reciente primero, con el mismo movimiento compensatorio que una reversa manual —
+     * los pagos y sus comprobantes quedan en la bitácora, nunca se editan ni se borran) y luego, si estaba
+     * desembolsado, su propio comprobante de desembolso, igual que hace `cancelar()`. Si algún pago no se puede
+     * reversar (interés ya facturado, reprogramación posterior), esa validación aborta todo: nada queda a medias.
      */
     public function eliminar(Credito $credito): bool
     {
         return DB::transaction(function () use ($credito) {
+            $credito = $this->creditos->bloquear($credito->id);
+
             if ($credito->estado === EstadoCredito::Refinanciado) {
                 throw ValidationException::withMessages(['credito' => __('validation.custom.credito.refinanciado_no_eliminable')]);
             }
 
             $this->exigirNoSerRefinanciacionDesembolsada($credito);
 
-            if ($credito->pagos()->exists()) {
-                throw ValidationException::withMessages(['credito' => __('validation.custom.credito.tiene_pagos_registrados')]);
-            }
+            $motivo = 'Eliminación del crédito #'.$credito->id;
+            $this->pagoService->reversarTodos($credito, $motivo, Auth::id());
+            $credito->refresh();
 
             if ($credito->estado === EstadoCredito::Desembolsado) {
-                $this->reversarDesembolsoSiExiste($credito, 'Eliminación del crédito #'.$credito->id);
+                $this->reversarDesembolsoSiExiste($credito, $motivo);
             }
 
             $this->cuotas->eliminarTodasDeCredito($credito->id);

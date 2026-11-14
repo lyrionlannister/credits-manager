@@ -72,6 +72,7 @@ class TrazabilidadCreditosPagosTest extends TestCase
             'tipo_credito' => TipoCredito::Refinanciacion->value,
             'credito_origen_id' => $origen->id,
             'valor_adicional' => 500000,
+            'saldo_refinanciado_previsualizado' => 900, // capital pendiente del origen: su única cuota, sin pagos.
         ]);
         unset($payload['valor_prestamo']);
 

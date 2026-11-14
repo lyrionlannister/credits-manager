@@ -71,12 +71,16 @@ export const CreateCreditForm: FC = () => {
         setCreditoOrigenId(null);
     };
 
-    const buildPayload = () => ({
+    const buildPayload = (saldoRefinanciadoPrevisualizado?: string | null) => ({
         cliente_id: cliente?.id,
         tipo_credito: tipoCredito,
         credito_origen_id: tipoCredito === 'refinanciacion' ? creditoOrigenId : null,
         // En una refinanciación el servidor calcula el préstamo: saldo de capital del original + valor adicional.
         ...(tipoCredito === 'refinanciacion' ? { valor_adicional: valorPrestamo } : { valor_prestamo: valorPrestamo }),
+        // Solo al crear (no al previsualizar): el servidor rechaza si el saldo del original cambió desde que se vio este valor.
+        ...(tipoCredito === 'refinanciacion' && saldoRefinanciadoPrevisualizado !== undefined
+            ? { saldo_refinanciado_previsualizado: saldoRefinanciadoPrevisualizado }
+            : {}),
         tasa_interes: tasaInteres,
         gastos_administracion_pct: gastosAdministracion,
         plazo,
@@ -121,7 +125,7 @@ export const CreateCreditForm: FC = () => {
         try {
             const response = await sendRequest<{ credito: ApiCredit }>('/creditos', {
                 method: 'POST',
-                body: buildPayload(),
+                body: buildPayload(preview?.saldo_refinanciado),
             });
 
             navigate(`/creditos/${response.credito.id}`, {

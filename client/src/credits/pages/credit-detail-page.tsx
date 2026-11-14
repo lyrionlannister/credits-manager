@@ -141,7 +141,7 @@ export const CreditDetailPage: FC = () => {
                             Cancelar
                         </Button>
                     )}
-                    {canEliminar && pagos.length === 0 && (
+                    {canEliminar && (
                         <Button variant="outline" onClick={() => setShowDeleteConfirm(true)}>
                             Eliminar
                         </Button>
@@ -187,7 +187,11 @@ export const CreditDetailPage: FC = () => {
                 onConfirm={() => void confirmarEliminar()}
                 variant="danger"
                 title="Eliminar crédito"
-                description={`¿Seguro que quieres eliminar el crédito #${credito.id}? Esta acción NO se puede revertir.`}
+                description={
+                    pagos.length > 0
+                        ? `¿Seguro que quieres eliminar el crédito #${credito.id}? Primero se reversarán sus ${pagos.length} pago(s) registrado(s) (quedan en la bitácora, no se borran) y, si estaba desembolsado, su comprobante contable. Esta acción NO se puede revertir desde aquí.`
+                        : `¿Seguro que quieres eliminar el crédito #${credito.id}? Esta acción NO se puede revertir.`
+                }
                 confirmLabel="Eliminar"
                 isConfirming={isDeleting}
             />
