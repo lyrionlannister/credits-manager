@@ -45,6 +45,9 @@ class CrearCreditoRequest extends FormRequest
             // En una refinanciación el valor del préstamo lo calcula el servidor: saldo de capital del original + `valor_adicional`.
             'valor_prestamo' => ['required_unless:tipo_credito,refinanciacion', 'prohibited_if:tipo_credito,refinanciacion', 'numeric', 'min:0.01'],
             'valor_adicional' => ['required_if:tipo_credito,refinanciacion', 'prohibited_unless:tipo_credito,refinanciacion', 'numeric', 'min:0'],
+            // Lo que la previsualización mostró como saldo de capital del original: si cambió (p. ej. un pago entre
+            // previsualizar y crear), el servidor rechaza la creación en vez de guardar un saldo distinto del aprobado.
+            'saldo_refinanciado_previsualizado' => ['required_if:tipo_credito,refinanciacion', 'prohibited_unless:tipo_credito,refinanciacion', 'numeric', 'min:0'],
             'tasa_interes' => ['required', 'numeric', 'min:0'],
             'gastos_administracion_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'plazo' => ['required', 'integer', 'min:1'],

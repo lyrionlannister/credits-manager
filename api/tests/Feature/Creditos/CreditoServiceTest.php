@@ -67,6 +67,7 @@ class CreditoServiceTest extends TestCase
             'tipo_credito' => TipoCredito::Refinanciacion->value,
             'credito_origen_id' => $origen->id,
             'valor_adicional' => 500,
+            'saldo_refinanciado_previsualizado' => 500, // capital pendiente del origen: 900 - 300 (cuota 1) - 100 (abono de la cuota 3).
             'tasa_interes' => 5,
             'plazo' => 3,
             'tipo_pago' => TipoPago::Mensual->value,

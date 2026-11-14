@@ -129,6 +129,7 @@ class GastosAdministracionTest extends TestCase
             'tipo_credito' => 'refinanciacion',
             'credito_origen_id' => $origen->id,
             'valor_adicional' => 500000,
+            'saldo_refinanciado_previsualizado' => 2500000, // capital pendiente del origen: recién desembolsado, sin pagos.
             'tasa_interes' => 5,
             'plazo' => 3,
             'tipo_pago' => 'mensual',

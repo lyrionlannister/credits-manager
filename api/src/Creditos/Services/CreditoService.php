@@ -144,6 +144,7 @@ class CreditoService
     {
         return DB::transaction(function () use ($datos) {
             [$valorPrestamo, $saldoTomado] = $this->valorDelPrestamo($datos);
+            $this->exigirSaldoRefinanciadoVigente($datos, $saldoTomado);
             $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? 0);
 
             $credito = $this->creditos->crear([
@@ -356,6 +357,22 @@ class CreditoService
         }
 
         return [$valorPrestamo, $saldoTomado];
+    }
+
+    /**
+     * El saldo que el usuario vio y aprobó al previsualizar debe seguir vigente: si el original recibió un pago
+     * entre la previsualización y esta creación, el saldo a refinanciar ya cambió y la refinanciación no se crea
+     * con cifras distintas de las que el usuario confirmó.
+     */
+    private function exigirSaldoRefinanciadoVigente(array $datos, ?Dinero $saldoTomado): void
+    {
+        if ($saldoTomado === null) {
+            return;
+        }
+
+        if (! $saldoTomado->igualA(Dinero::desdePesos($datos['saldo_refinanciado_previsualizado']))) {
+            throw ValidationException::withMessages(['credito_origen_id' => __('validation.custom.credito_origen_id.saldo_cambio_desde_previsualizacion')]);
+        }
     }
 
     /**

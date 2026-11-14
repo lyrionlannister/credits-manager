@@ -38,10 +38,15 @@ class RefinanciacionTest extends TestCase
         return $origen;
     }
 
-    /** Sin `valor_prestamo`: lo calcula el servidor (capital pendiente del original + `valor_adicional`). */
+    /**
+     * Sin `valor_prestamo`: lo calcula el servidor (capital pendiente del original + `valor_adicional`). Previsualiza
+     * primero, como hace el formulario real, y manda ese saldo con la creación — el servidor lo exige para
+     * detectar si el saldo del original cambió entre la previsualización y este envío. Si el caso ya sabe qué
+     * saldo espera (p. ej. un original sin saldo), pásalo en `$cambios` y se usa tal cual, sin previsualizar.
+     */
     private function solicitarRefinanciacion(Credito $origen, ?Cliente $cliente = null, array $cambios = []): TestResponse
     {
-        return $this->postJson('/api/v1/creditos', array_merge([
+        $datos = array_merge([
             'cliente_id' => ($cliente ?? $this->cliente)->id,
             'tipo_credito' => TipoCredito::Refinanciacion->value,
             'credito_origen_id' => $origen->id,
@@ -50,7 +55,14 @@ class RefinanciacionTest extends TestCase
             'plazo' => 3,
             'tipo_pago' => 'mensual',
             'fecha_desembolso' => '2026-04-01',
-        ], $cambios));
+        ], $cambios);
+
+        if (! array_key_exists('saldo_refinanciado_previsualizado', $cambios)) {
+            $preview = $this->postJson('/api/v1/creditos/previsualizar', $datos);
+            $datos['saldo_refinanciado_previsualizado'] = $preview->status() < 300 ? $preview->json('saldo_refinanciado') : null;
+        }
+
+        return $this->postJson('/api/v1/creditos', $datos);
     }
 
     /** Solicita y aprueba la refinanciación, sin desembolsarla todavía; devuelve su id. */
@@ -113,7 +125,7 @@ class RefinanciacionTest extends TestCase
         $origen = $this->crearCredito($cliente, ['valor_prestamo' => 300]);
         $this->crearCuota($origen, ['numero_cuota' => 1, 'valor' => 300, 'valor_capital' => 300, 'valor_pagado' => 300, 'estado' => EstadoCuota::Pagada]);
 
-        $this->solicitarRefinanciacion($origen, $cliente, ['valor_adicional' => 0])
+        $this->solicitarRefinanciacion($origen, $cliente, ['valor_adicional' => 0, 'saldo_refinanciado_previsualizado' => 0])
             ->assertStatus(422)
             ->assertJsonValidationErrors('valor_adicional');
 
@@ -160,6 +172,37 @@ class RefinanciacionTest extends TestCase
 
         $this->assertSame(EstadoCredito::Aprobado, Credito::findOrFail($id)->estado);
         $this->assertSame(EstadoCredito::Desembolsado, $origen->fresh()->estado);
+    }
+
+    /**
+     * Entre previsualizar y crear, el original recibió un pago: el saldo que el usuario vio ya no es el actual.
+     * El servidor rechaza en vez de crear la refinanciación con un saldo distinto del aprobado.
+     */
+    public function test_si_el_saldo_del_original_cambia_entre_previsualizar_y_crear_se_rechaza(): void
+    {
+        $origen = $this->crearOrigen();
+        $this->crearReglasDeCreditoYPago();
+
+        $preview = $this->postJson('/api/v1/creditos/previsualizar', [
+            'cliente_id' => $this->cliente->id,
+            'tipo_credito' => TipoCredito::Refinanciacion->value,
+            'credito_origen_id' => $origen->id,
+            'valor_adicional' => 500,
+            'tasa_interes' => 5,
+            'plazo' => 3,
+            'tipo_pago' => 'mensual',
+            'fecha_desembolso' => '2026-04-01',
+        ])->assertOk();
+        $saldoPrevisualizado = $preview->json('saldo_refinanciado');
+        $this->assertSame('600.00', $saldoPrevisualizado);
+
+        $this->postJson("/api/v1/creditos/{$origen->id}/pagos", ['valor_pago' => 100, 'forma_pago' => 'efectivo'])->assertCreated();
+
+        $this->solicitarRefinanciacion($origen, null, ['saldo_refinanciado_previsualizado' => $saldoPrevisualizado])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.credito_origen_id.0', 'El saldo de capital del crédito original cambió desde que se calculó la previsualización; vuelve a previsualizar antes de crear la refinanciación.');
+
+        $this->assertDatabaseCount('creditos', 1);
     }
 
     public function test_el_asiento_del_desembolso_registra_solo_el_dinero_nuevo(): void
