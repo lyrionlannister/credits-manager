@@ -81,7 +81,10 @@ class CreditoService
                 $tasa,
                 $fechas,
                 (int) $this->cuotas->todasPorCredito($credito->id)->max('numero_cuota') + 1,
-                OtrosGastosCalculator::valorPorCuota($this->cuotaService->capitalPendiente($credito), (float) $credito->gastos_administracion_pct),
+                // Misma base que `conOtrosGastos()`, `actualizarGastosAdministracion()` y el accessor `valorCuotaTotal`
+                // del modelo: el valor prestado original, nunca el saldo pendiente (si no, el total del crédito que
+                // se muestra deja de coincidir con lo que quedó guardado en las cuotas nuevas).
+                OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, (float) $credito->gastos_administracion_pct),
             );
             $this->planCuotas->recalcularSaldoCapital($credito);
             $credito = $this->planCuotas->actualizarTotalesDelCredito($credito, $calculo['valor_cuota'], $tasa);

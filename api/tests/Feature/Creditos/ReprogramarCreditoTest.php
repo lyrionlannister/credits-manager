@@ -179,6 +179,29 @@ class ReprogramarCreditoTest extends TestCase
         $this->assertEquals(300, $credito->cuotas()->get()->sum(fn ($cuota) => $cuota->valor_capital->aFloat()));
     }
 
+    /**
+     * Otros gastos por cuota = valor prestado original × porcentaje — misma base que `conOtrosGastos()`,
+     * `actualizarGastosAdministracion()` y el accessor `valorCuotaTotal` del crédito. Nunca el saldo pendiente:
+     * si no, el total que muestra el crédito deja de coincidir con lo que quedó guardado en las cuotas nuevas.
+     */
+    public function test_otros_gastos_de_las_cuotas_nuevas_usan_el_valor_prestado_no_el_saldo_pendiente(): void
+    {
+        $this->actingAsAdmin();
+        $this->crearReglasDeCreditoYPago();
+        $credito = $this->crearCredito($this->crearCliente(), ['valor_prestamo' => 300, 'valor_cuota' => 100, 'valor_total' => 300, 'gastos_administracion_pct' => 10]);
+        foreach ([1, 2, 3] as $numero) {
+            $this->crearCuota($credito, ['numero_cuota' => $numero, 'fecha_vencimiento' => now()->addMonths($numero)->toDateString(), 'valor' => 100, 'valor_capital' => 100]);
+        }
+        app(PagoService::class)->registrarPago($credito, Dinero::desdePesos(100), FormaPago::Efectivo, null, null);
+
+        $this->postJson($this->url($credito), $this->datos(['tasa_interes' => 0]))->assertOk();
+
+        $esperado = '30.00'; // 300 (valor_prestamo original) × 10 %, no 200 (saldo pendiente tras el abono) × 10 %.
+        $nuevas = $credito->cuotas()->where('estado', '!=', EstadoCuota::Pagada)->get();
+        $this->assertNotEmpty($nuevas);
+        $this->assertTrue($nuevas->every(fn ($cuota) => $cuota->valor_otros_gastos->aDecimalString() === $esperado));
+    }
+
     public function test_no_se_reversa_un_pago_anterior_a_la_reprogramacion(): void
     {
         $this->actingAsAdmin();
