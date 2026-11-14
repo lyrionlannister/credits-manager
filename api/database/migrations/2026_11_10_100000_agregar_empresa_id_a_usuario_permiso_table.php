@@ -32,7 +32,7 @@ return new class extends Migration
                 foreach ($filas as $fila) {
                     DB::table('usuario_permiso')->where('id', $fila->id)->update(['empresa_id' => $fila->empresa_id]);
                 }
-            }, 'usuario_permiso.id');
+            }, 'usuario_permiso.id', 'id');
 
         Schema::table('usuario_permiso', function (Blueprint $table) {
             $table->unique(['usuario_id', 'empresa_id', 'permiso_id']);
