@@ -203,7 +203,7 @@ export const CreateCreditForm: FC = () => {
                 </div>
 
                 <div>
-                    <Label htmlFor="tasa-interes">Tasa de interés (% por periodo)</Label>
+                    <Label htmlFor="tasa-interes">Tasa de interés (% Mensual)</Label>
                     <Input
                         id="tasa-interes"
                         name="tasa-interes"

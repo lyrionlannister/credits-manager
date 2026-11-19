@@ -95,7 +95,7 @@ export const EditCreditForm: FC<EditCreditFormProps> = ({ credito }) => {
                 </div>
 
                 <div>
-                    <Label htmlFor="tasa-interes">Tasa de interés (% por periodo)</Label>
+                    <Label htmlFor="tasa-interes">Tasa de interés (% Mensual)</Label>
                     <Input
                         id="tasa-interes"
                         name="tasa-interes"
