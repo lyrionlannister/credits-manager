@@ -16,6 +16,7 @@ use App\Creditos\Models\ReprogramacionCredito;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Repositories\ReprogramacionCreditoRepository;
+use App\Creditos\Services\AmortizacionCalculator;
 use App\Creditos\Services\OtrosGastosCalculator;
 use App\Creditos\Services\PlanCuotasService;
 use App\Exportacion\Enums\FormatoExportacion;
@@ -293,7 +294,7 @@ class PagoService
         $diasTranscurridos = (int) $fechaReferencia->diffInDays($fechaCorte);
 
         $divisorPeriodo = $credito->tipo_pago->diasPorPeriodo();
-        $tasaDiaria = ((float) $credito->tasa_interes / 100) / $divisorPeriodo;
+        $tasaDiaria = AmortizacionCalculator::tasaPeriodo((float) $credito->tasa_interes, $credito->tipo_pago) / $divisorPeriodo;
 
         $interes = $capitalPendiente->multiplicarPorTasa($tasaDiaria * $diasTranscurridos);
         $otrosGastos = $this->otrosGastosLiquidacion($credito);
