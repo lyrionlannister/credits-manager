@@ -20,6 +20,9 @@ use InvalidArgumentException;
  * del período" se redondea una única vez a centavo vía `Dinero`, nunca se acumula
  * error de flotante en sumas/restas posteriores (esas son aritmética entera exacta).
  *
+ * `$tasaInteres` siempre es la tasa mensual capturada, nunca la tasa del periodo: `tasaPeriodo()` la convierte según
+ * `$tipoPago` antes de usarla como `$i` (ver su docblock).
+ *
  * Diferencias deliberadas con el legado: el mes se suma sin desbordar (un desembolso del 31 de enero vence el 28 de
  * febrero, no el 3 de marzo) y, si se da la fecha del primer vencimiento, el interés de la primera cuota se prorratea
  * por los días reales desde el desembolso; el capital de cada cuota no cambia.
@@ -43,7 +46,7 @@ class AmortizacionCalculator
         ?string $fechaPrimerVencimiento = null,
         bool $prorratearPrimera = true,
     ): array {
-        $i = $tasaInteres / 100;
+        $i = self::tasaPeriodo($tasaInteres, $tipoPago);
 
         if ($i > 0) {
             $factorCuota = $i / (1 - (1 + $i) ** -$plazo);
@@ -110,6 +113,23 @@ class AmortizacionCalculator
             'valor_total' => $valorTotal,
             'cuotas' => $cuotas,
         ];
+    }
+
+    /**
+     * `$tasaMensual` es siempre la tasa mensual capturada (efectiva, no la del periodo): para Quincenal se deriva la
+     * tasa periódica equivalente por equivalencia de tasas compuestas sobre `TipoPago::diasPorPeriodo()`, no
+     * dividiendo entre 2 — así la misma tasa mensual cuesta lo mismo sin importar si el crédito es mensual o
+     * quincenal. Centralizado aquí porque todo caller de `calcular()` recibe `tasa_interes` ya en esa convención.
+     */
+    public static function tasaPeriodo(float $tasaMensual, TipoPago $tipoPago): float
+    {
+        $iMensual = $tasaMensual / 100;
+
+        if ($tipoPago === TipoPago::Mensual) {
+            return $iMensual;
+        }
+
+        return (1 + $iMensual) ** ($tipoPago->diasPorPeriodo() / TipoPago::Mensual->diasPorPeriodo()) - 1;
     }
 
     /** Quincenal: cada periodo salta al siguiente 15 o fin de mes, así que desde cualquier fecha cae en un día fijo. */
