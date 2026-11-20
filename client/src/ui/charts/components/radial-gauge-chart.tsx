@@ -37,8 +37,9 @@ export const RadialGaugeChart: FC<RadialGaugeChartProps> = ({ percentage, color,
         labels: ['Porcentaje'],
     };
 
+    // apexcharts 8 ya no recorta el lienzo del semicírculo: sin esto queda media altura en blanco bajo el arco.
     return (
-        <div id="chartDarkStyle">
+        <div id="chartDarkStyle" className="overflow-hidden" style={{ height: height / 2 }}>
             <Chart type="radialBar" height={height} series={[valor]} options={options} />
         </div>
     );
