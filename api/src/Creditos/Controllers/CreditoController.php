@@ -14,6 +14,7 @@ use App\Creditos\Requests\ReprogramarCreditoRequest;
 use App\Creditos\Services\CreditoService;
 use App\Creditos\Services\CuotaService;
 use App\Creditos\Services\EstadoCuentaService;
+use App\Creditos\Services\SimulacionCreditoService;
 use App\Exportacion\Enums\FormatoExportacion;
 use App\Http\Controllers\Controller;
 use App\Pagos\Services\PagoService;
@@ -28,6 +29,7 @@ class CreditoController extends Controller
         protected CuotaService $cuotas,
         protected PagoService $pagos,
         protected EstadoCuentaService $estadosCuenta,
+        protected SimulacionCreditoService $simulaciones,
     ) {}
 
     public function index(Request $peticion): JsonResponse
@@ -67,6 +69,16 @@ class CreditoController extends Controller
     public function previsualizar(PrevisualizarCreditoRequest $peticion): JsonResponse
     {
         return response()->json($this->creditos->previsualizarCredito($peticion->validated()));
+    }
+
+    public function previsualizarPdf(PrevisualizarCreditoRequest $peticion): Response
+    {
+        $pdf = $this->simulaciones->generarPdf($peticion->validated());
+
+        return response($pdf->contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$pdf->nombreArchivo.'.pdf"',
+        ]);
     }
 
     public function update(EditarCreditoRequest $peticion, Credito $credito): JsonResponse
