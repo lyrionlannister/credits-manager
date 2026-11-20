@@ -8,7 +8,7 @@ export const RefinancingBaseCard: FC<RefinancingBaseCardProps> = ({ saldoTomado,
     const valorNuevoCredito = saldoTomado === null ? null : Number(saldoTomado) + (Number(valorAdicional) || 0);
 
     return (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 md:col-span-3 dark:border-gray-800 dark:bg-white/3">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 col-span-full dark:border-gray-800 dark:bg-white/3">
             <p className="text-sm text-gray-500 dark:text-gray-400">Saldo de capital del crédito original (se toma como base)</p>
 
             {isLoading ? (

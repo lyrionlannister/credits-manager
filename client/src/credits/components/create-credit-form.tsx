@@ -15,9 +15,11 @@ import { Select } from '@ui/forms/components/select';
 import { Spinner } from '@ui/spinner/components/spinner';
 import { Eye } from 'lucide-react';
 import { formatMoney } from '../../shared/utils/format-money';
+import { CreditFormGuide } from './credit-form-guide';
 import { CreditPreviewModal } from './credit-preview-modal';
 import { RefinancingBaseCard } from './refinancing-base-card';
 import { CREDIT_TYPE_OPTIONS } from '../constants/credit-type-options';
+import { monthlyRateFromAnnual } from '../utils/monthly-rate-from-annual';
 import { PAYMENT_TYPE_OPTIONS } from '../constants/payment-type-options';
 import type { ApiCredit } from '../types/api-credit';
 import type { ApiCreditDetail } from '../types/api-credit-detail';
@@ -49,7 +51,7 @@ export const CreateCreditForm: FC = () => {
     const saldoTomado = creditoOrigenId ? (origenDetalle?.resumen_cuotas.saldo_capital_pendiente ?? null) : null;
 
     const [valorPrestamo, setValorPrestamo] = useState('');
-    const [tasaInteres, setTasaInteres] = useState('');
+    const [tasaEfectivaAnual, setTasaEfectivaAnual] = useState('');
     const [gastosAdministracion, setGastosAdministracion] = useState('0');
     const [plazo, setPlazo] = useState('');
     const [tipoPago, setTipoPago] = useState<PaymentType>('mensual');
@@ -81,7 +83,7 @@ export const CreateCreditForm: FC = () => {
         ...(tipoCredito === 'refinanciacion' && saldoRefinanciadoPrevisualizado !== undefined
             ? { saldo_refinanciado_previsualizado: saldoRefinanciadoPrevisualizado }
             : {}),
-        tasa_interes: tasaInteres,
+        tasa_efectiva_anual: tasaEfectivaAnual,
         gastos_administracion_pct: gastosAdministracion,
         plazo,
         tipo_pago: tipoPago,
@@ -141,172 +143,172 @@ export const CreateCreditForm: FC = () => {
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 print:hidden">
-                {error && (
-                    <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 md:col-span-3 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
-                        {error}
-                    </div>
-                )}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 xl:col-span-2 dark:border-gray-800 dark:bg-white/3">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {error && (
+                        <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 md:col-span-2 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400">
+                            {error}
+                        </div>
+                    )}
 
-                <div className="md:col-span-3">
-                    <Label htmlFor="credito-cliente">Cliente</Label>
-                    <ClientSelector id="credito-cliente" selected={cliente} onSelect={handleClienteSelect} />
-                </div>
-
-                <div>
-                    <Label htmlFor="tipo-credito">Tipo de crédito</Label>
-                    <Select
-                        id="tipo-credito"
-                        options={CREDIT_TYPE_OPTIONS}
-                        defaultValue={tipoCredito}
-                        onChange={(value) => handleTipoCreditoChange(value as CreditType)}
-                    />
-                </div>
-
-                {tipoCredito === 'refinanciacion' && (
                     <div className="md:col-span-2">
-                        <Label htmlFor="credito-origen">Crédito que refinancia</Label>
-                        <Select
-                            id="credito-origen"
-                            options={creditosActivos.map((c) => ({
-                                value: String(c.id),
-                                label: `#${c.id} — ${formatMoney(c.valor_prestamo)}`,
-                            }))}
-                            placeholder={cliente ? 'Selecciona el crédito activo del cliente…' : 'Primero selecciona un cliente'}
-                            onChange={(value) => setCreditoOrigenId(value ? Number(value) : null)}
-                        />
-                        <p className="mt-1.5 text-theme-xs text-gray-500 dark:text-gray-400">
-                            El crédito original sigue activo y recibiendo pagos hasta que se desembolse esta refinanciación.
-                        </p>
+                        <Label htmlFor="credito-cliente">Cliente</Label>
+                        <ClientSelector id="credito-cliente" selected={cliente} onSelect={handleClienteSelect} />
                     </div>
+
+                    <div>
+                        <Label htmlFor="tipo-credito">Tipo de crédito</Label>
+                        <Select
+                            id="tipo-credito"
+                            options={CREDIT_TYPE_OPTIONS}
+                            defaultValue={tipoCredito}
+                            onChange={(value) => handleTipoCreditoChange(value as CreditType)}
+                        />
+                    </div>
+
+                    {tipoCredito === 'refinanciacion' && (
+                        <div>
+                            <Label htmlFor="credito-origen">Crédito que refinancia</Label>
+                            <Select
+                                id="credito-origen"
+                                options={creditosActivos.map((c) => ({
+                                    value: String(c.id),
+                                    label: `#${c.id} — ${formatMoney(c.valor_prestamo)}`,
+                                }))}
+                                placeholder={cliente ? 'Selecciona el crédito activo del cliente…' : 'Primero selecciona un cliente'}
+                                onChange={(value) => setCreditoOrigenId(value ? Number(value) : null)}
+                            />
+                            <p className="mt-1.5 text-theme-xs text-gray-500 dark:text-gray-400">
+                                El crédito original sigue activo y recibiendo pagos hasta que se desembolse esta refinanciación.
+                            </p>
+                        </div>
+                    )}
+
+                    {tipoCredito === 'refinanciacion' && (
+                        <RefinancingBaseCard saldoTomado={saldoTomado} valorAdicional={valorPrestamo} isLoading={isLoadingOrigen && !origenDetalle} />
+                    )}
+
+                    <div>
+                        <Label htmlFor="valor-prestamo">
+                            {tipoCredito === 'refinanciacion' ? 'Nuevo valor a prestar (puede ser 0)' : 'Valor del préstamo'}
+                        </Label>
+                        <Input
+                            id="valor-prestamo"
+                            name="valor-prestamo"
+                            type="number"
+                            step={0.01}
+                            min={tipoCredito === 'refinanciacion' ? '0' : '1'}
+                            required
+                            value={valorPrestamo}
+                            onChange={(event) => setValorPrestamo(event.target.value)}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="tasa-interes">Tasa de interés (% EA)</Label>
+                        <Input
+                            id="tasa-interes"
+                            name="tasa-interes"
+                            type="number"
+                            step={0.0001}
+                            min="0"
+                            required
+                            value={tasaEfectivaAnual}
+                            onChange={(event) => setTasaEfectivaAnual(event.target.value)}
+                            hint={monthlyRateFromAnnual(tasaEfectivaAnual) ? `Equivale a ${monthlyRateFromAnnual(tasaEfectivaAnual)} % mensual` : undefined}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="gastos-administracion">Gastos de administración (% Mensual)</Label>
+                        <Input
+                            id="gastos-administracion"
+                            name="gastos-administracion"
+                            type="number"
+                            step={0.001}
+                            min="0"
+                            max="100"
+                            value={gastosAdministracion}
+                            onChange={(event) => setGastosAdministracion(event.target.value)}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="plazo">Plazo (número de cuotas)</Label>
+                        <Input
+                            id="plazo"
+                            name="plazo"
+                            type="number"
+                            min="1"
+                            required
+                            value={plazo}
+                            onChange={(event) => setPlazo(event.target.value)}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="tipo-pago">Tipo de pago</Label>
+                        <Select
+                            id="tipo-pago"
+                            options={PAYMENT_TYPE_OPTIONS}
+                            defaultValue={tipoPago}
+                            onChange={(value) => setTipoPago(value as PaymentType)}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="fecha-desembolso">Fecha de desembolso</Label>
+                        <DatePicker
+                            id="fecha-desembolso"
+                            name="fecha-desembolso"
+                            required
+                            value={fechaDesembolso}
+                            onChange={setFechaDesembolso}
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="fecha-primer-vencimiento">Primer vencimiento (opcional)</Label>
+                        <DatePicker
+                            id="fecha-primer-vencimiento"
+                            name="fecha-primer-vencimiento"
+                            value={fechaPrimerVencimiento}
+                            onChange={setFechaPrimerVencimiento}
+                        />
+                    </div>
+
+                    <div className="flex justify-end border-t border-gray-100 pt-6 md:col-span-2 dark:border-gray-800">
+                        <Button
+                            type="submit"
+                            disabled={isPreviewing}
+                            startIcon={isPreviewing ? <Spinner size="sm" color="white" /> : undefined}
+                            endIcon={isPreviewing ? undefined : <Eye className="size-4" />}
+                        >
+                            {isPreviewing ? 'Calculando…' : 'Previsualizar cuotas'}
+                        </Button>
+                    </div>
+                </div>
+
+                {preview && cliente && (
+                    <CreditPreviewModal
+                        preview={preview}
+                        cliente={cliente}
+                        creditoOrigenId={tipoCredito === 'refinanciacion' ? creditoOrigenId : null}
+                        tasaInteres={preview.tasa_interes}
+                        tasaEfectivaAnual={tasaEfectivaAnual}
+                        plazo={Number(plazo)}
+                        tipoPago={tipoPago}
+                        fechaDesembolso={fechaDesembolso}
+                        pdfPayload={buildPayload()}
+                        isCreating={isCreating}
+                        onConfirm={handleConfirmarCreacion}
+                        onClose={() => setPreview(null)}
+                    />
                 )}
+            </form>
 
-                {tipoCredito === 'refinanciacion' && (
-                    <RefinancingBaseCard saldoTomado={saldoTomado} valorAdicional={valorPrestamo} isLoading={isLoadingOrigen && !origenDetalle} />
-                )}
-
-                <div>
-                    <Label htmlFor="valor-prestamo">
-                        {tipoCredito === 'refinanciacion' ? 'Nuevo valor a prestar (puede ser 0)' : 'Valor del préstamo'}
-                    </Label>
-                    <Input
-                        id="valor-prestamo"
-                        name="valor-prestamo"
-                        type="number"
-                        step={0.01}
-                        min={tipoCredito === 'refinanciacion' ? '0' : '1'}
-                        required
-                        value={valorPrestamo}
-                        onChange={(event) => setValorPrestamo(event.target.value)}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="tasa-interes">Tasa de interés (% Mensual)</Label>
-                    <Input
-                        id="tasa-interes"
-                        name="tasa-interes"
-                        type="number"
-                        step={0.001}
-                        min="0"
-                        required
-                        value={tasaInteres}
-                        onChange={(event) => setTasaInteres(event.target.value)}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="gastos-administracion">Gastos de administración (%)</Label>
-                    <Input
-                        id="gastos-administracion"
-                        name="gastos-administracion"
-                        type="number"
-                        step={0.001}
-                        min="0"
-                        max="100"
-                        value={gastosAdministracion}
-                        onChange={(event) => setGastosAdministracion(event.target.value)}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="plazo">Plazo (número de cuotas)</Label>
-                    <Input
-                        id="plazo"
-                        name="plazo"
-                        type="number"
-                        min="1"
-                        required
-                        value={plazo}
-                        onChange={(event) => setPlazo(event.target.value)}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="tipo-pago">Tipo de pago</Label>
-                    <Select
-                        id="tipo-pago"
-                        options={PAYMENT_TYPE_OPTIONS}
-                        defaultValue={tipoPago}
-                        onChange={(value) => setTipoPago(value as PaymentType)}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="fecha-desembolso">Fecha de desembolso</Label>
-                    <DatePicker
-                        id="fecha-desembolso"
-                        name="fecha-desembolso"
-                        required
-                        value={fechaDesembolso}
-                        onChange={setFechaDesembolso}
-                    />
-                </div>
-
-                <div>
-                    <Label htmlFor="fecha-primer-vencimiento">Primer vencimiento (opcional)</Label>
-                    <DatePicker
-                        id="fecha-primer-vencimiento"
-                        name="fecha-primer-vencimiento"
-                        value={fechaPrimerVencimiento}
-                        onChange={setFechaPrimerVencimiento}
-                    />
-                </div>
-
-                <p className="text-sm text-gray-500 md:col-span-3 dark:text-gray-400">
-                    Las cuotas se generan automáticamente con el <strong>sistema francés</strong> (cuota fija, interés
-                    compuesto sobre saldo insoluto). Si eliges el primer vencimiento, la primera cuota cobra el interés
-                    de los días reales desde el desembolso y las demás siguen cada periodo desde esa fecha. En quincenal las
-                    cuotas vencen el 15 y el último día de cada mes.
-                </p>
-
-                <div className="flex justify-end border-t border-gray-100 pt-6 md:col-span-3 dark:border-gray-800">
-                    <Button
-                        type="submit"
-                        disabled={isPreviewing}
-                        startIcon={isPreviewing ? <Spinner size="sm" color="white" /> : undefined}
-                        endIcon={isPreviewing ? undefined : <Eye className="size-4" />}
-                    >
-                        {isPreviewing ? 'Calculando…' : 'Previsualizar cuotas'}
-                    </Button>
-                </div>
-            </div>
-
-            {preview && cliente && (
-                <CreditPreviewModal
-                    preview={preview}
-                    cliente={cliente}
-                    creditoOrigenId={tipoCredito === 'refinanciacion' ? creditoOrigenId : null}
-                    tasaInteres={tasaInteres}
-                    plazo={Number(plazo)}
-                    tipoPago={tipoPago}
-                    fechaDesembolso={fechaDesembolso}
-                    isCreating={isCreating}
-                    onConfirm={handleConfirmarCreacion}
-                    onClose={() => setPreview(null)}
-                />
-            )}
-        </form>
+            <CreditFormGuide tipoPago={tipoPago} />
+        </div>
     );
 };
