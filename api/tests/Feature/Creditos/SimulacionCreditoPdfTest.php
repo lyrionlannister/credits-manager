@@ -33,12 +33,14 @@ class SimulacionCreditoPdfTest extends TestCase
         ];
     }
 
-    /** Descomprime los flujos del PDF para poder buscar el texto dibujado. */
+    /** Descomprime los flujos del PDF y quita el escape de `(`, `)` y `\` de sus cadenas literales para buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
         preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
 
-        return collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        $texto = collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+
+        return strtr($texto, ['\\(' => '(', '\\)' => ')', '\\\\' => '\\']);
     }
 
     public function test_rechaza_una_simulacion_sin_datos(): void

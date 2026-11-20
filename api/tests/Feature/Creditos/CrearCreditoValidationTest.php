@@ -100,7 +100,7 @@ class CrearCreditoValidationTest extends TestCase
         $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28'], $fechas);
     }
 
-    public function test_con_primer_vencimiento_la_primera_cuota_cobra_interes_por_dias(): void
+    public function test_con_primer_vencimiento_la_primera_cuota_cobra_el_interes_del_mes_completo(): void
     {
         $this->actingAsAdmin();
         $cliente = $this->crearCliente();
@@ -115,7 +115,7 @@ class CrearCreditoValidationTest extends TestCase
 
         $primera = DB::table('cuotas')->where('credito_id', $respuesta->json('credito.id') ?? $respuesta->json('id'))->orderBy('numero_cuota')->first();
         $this->assertSame('2026-01-16', $primera->fecha_vencimiento);
-        $this->assertSame(5000, (int) $primera->valor_interes);
+        $this->assertSame(10000, (int) $primera->valor_interes);
     }
 
     public function test_rechaza_tasa_de_interes_negativa(): void
