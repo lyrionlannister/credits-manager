@@ -10,6 +10,7 @@ use App\Creditos\Requests\EditarCreditoRequest;
 use App\Creditos\Requests\ExportarCreditosRequest;
 use App\Creditos\Requests\ExportarEstadoCuentaRequest;
 use App\Creditos\Requests\PrevisualizarCreditoRequest;
+use App\Creditos\Requests\PrevisualizarEdicionCreditoRequest;
 use App\Creditos\Requests\ReprogramarCreditoRequest;
 use App\Creditos\Services\CreditoService;
 use App\Creditos\Services\CuotaService;
@@ -79,6 +80,11 @@ class CreditoController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$pdf->nombreArchivo.'.pdf"',
         ]);
+    }
+
+    public function previsualizarEdicion(PrevisualizarEdicionCreditoRequest $peticion, Credito $credito): JsonResponse
+    {
+        return response()->json($this->creditos->previsualizarEdicion($credito, $peticion->validated()));
     }
 
     public function update(EditarCreditoRequest $peticion, Credito $credito): JsonResponse

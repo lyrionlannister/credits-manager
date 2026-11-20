@@ -209,6 +209,19 @@ class CreditoService
         return $this->previsualizacion($valorPrestamo, $saldoTomado, (float) ($datos['gastos_administracion_pct'] ?? 0), $datos);
     }
 
+    /** Mismo cálculo que `editarCondiciones`, sin tocar la base de datos: así se ve el plan antes de regenerarlo. */
+    public function previsualizarEdicion(Credito $credito, array $datos): array
+    {
+        $this->exigirEditable($credito);
+
+        return $this->previsualizacion(
+            $this->valorPrestamoEditado($credito, $datos),
+            $credito->saldo_refinanciado,
+            (float) ($datos['gastos_administracion_pct'] ?? $credito->gastos_administracion_pct),
+            $datos,
+        );
+    }
+
     private function previsualizacion(Dinero $valorPrestamo, ?Dinero $saldoTomado, float $porcentajeGastos, array $datos): array
     {
         $plazo = (int) $datos['plazo'];
