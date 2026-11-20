@@ -26,7 +26,8 @@ class EditarCreditoRequest extends FormRequest
             // En una refinanciación el préstamo es el saldo tomado del original más el valor adicional.
             'valor_prestamo' => $esRefinanciacion ? ['prohibited'] : ['required', 'numeric', 'min:0.01'],
             'valor_adicional' => $esRefinanciacion ? ['required', 'numeric', 'min:0'] : ['prohibited'],
-            'tasa_interes' => ['required', 'numeric', 'min:0'],
+            'tasa_efectiva_anual' => ['required_without:tasa_interes', 'prohibits:tasa_interes', 'nullable', 'numeric', 'min:0', 'max:999'],
+            'tasa_interes' => ['required_without:tasa_efectiva_anual', 'nullable', 'numeric', 'min:0'],
             'gastos_administracion_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'plazo' => ['required', 'integer', 'min:1'],
             'tipo_pago' => ['required', Rule::enum(TipoPago::class)],

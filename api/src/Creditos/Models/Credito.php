@@ -11,6 +11,7 @@ use App\Core\Dinero\DineroCast;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\TipoCredito;
 use App\Creditos\Enums\TipoPago;
+use App\Creditos\Services\AmortizacionCalculator;
 use App\Creditos\Services\OtrosGastosCalculator;
 use App\Pagos\Models\Pago;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'valor_prestamo',
     'saldo_refinanciado',
     'tasa_interes',
+    'tasa_efectiva_anual',
     'gastos_administracion_pct',
     'plazo',
     'tipo_pago',
@@ -60,7 +62,8 @@ class Credito extends BaseModel
             'estado' => EstadoCredito::class,
             'valor_prestamo' => DineroCast::class,
             'saldo_refinanciado' => DineroCast::class,
-            'tasa_interes' => 'decimal:3',
+            'tasa_interes' => 'decimal:6',
+            'tasa_efectiva_anual' => 'decimal:4',
             'gastos_administracion_pct' => 'decimal:3',
             'valor_cuota' => DineroCast::class,
             'valor_total' => DineroCast::class,
@@ -75,15 +78,23 @@ class Credito extends BaseModel
         return $this->saldo_refinanciado === null ? $this->valor_prestamo : $this->valor_prestamo->restar($this->saldo_refinanciado);
     }
 
+    /** Tasa mensual para recalcular el plan: si se pactó en EA, la exacta derivada de ella; si no, la mensual guardada (créditos anteriores). */
+    public function tasaMensual(): float
+    {
+        return $this->tasa_efectiva_anual !== null
+            ? AmortizacionCalculator::tasaMensualDesdeEfectivaAnual((float) $this->tasa_efectiva_anual)
+            : (float) $this->tasa_interes;
+    }
+
     protected function valorCuotaTotal(): Attribute
     {
-        return Attribute::make(get: fn () => $this->valor_cuota->sumar(OtrosGastosCalculator::valorPorCuota($this->valor_prestamo, (float) $this->gastos_administracion_pct)));
+        return Attribute::make(get: fn () => $this->valor_cuota->sumar(OtrosGastosCalculator::valorPorCuota($this->valor_prestamo, (float) $this->gastos_administracion_pct, $this->tipo_pago)));
     }
 
     /** Total a pagar del plan más los otros gastos de todas sus cuotas (cada cuota lleva el mismo valor). */
     protected function valorTotalConOtros(): Attribute
     {
-        $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($this->valor_prestamo, (float) $this->gastos_administracion_pct);
+        $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($this->valor_prestamo, (float) $this->gastos_administracion_pct, $this->tipo_pago);
 
         return Attribute::make(get: fn () => $this->valor_total->sumar(Dinero::sumarVarios(...array_fill(0, $this->plazo, $otrosPorCuota))));
     }

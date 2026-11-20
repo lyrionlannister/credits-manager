@@ -15,7 +15,10 @@ export type ApiCredit = {
     valor_prestamo: string;
     /** Solo en refinanciaciones: saldo de capital tomado del original. Decimal string; nulo si no aplica o es anterior a la columna. */
     saldo_refinanciado: string | null;
+    /** Tasa mensual (%) con la que se calculan las cuotas; si hay EA, derivada de ella. Decimal string (ej. "2.117600"). */
     tasa_interes: string;
+    /** Tasa efectiva anual (%) pactada. Decimal string; nula en créditos anteriores a la EA. */
+    tasa_efectiva_anual: string | null;
     /** Porcentaje de otros gastos de administración sobre el capital inicial. Decimal string (ej. "0.200"). */
     gastos_administracion_pct: string;
     plazo: number;

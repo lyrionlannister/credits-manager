@@ -222,4 +222,33 @@ class CrearCreditoValidationTest extends TestCase
         $respuesta->assertStatus(403);
         $this->assertDatabaseCount('creditos', 0);
     }
+
+    /** Tabla de DDA: 28,59 % EA es 2,1176 % mensual; la cuota sale de la mensual exacta, no de la redondeada. */
+    public function test_con_tasa_efectiva_anual_guarda_la_ea_y_la_mensual_derivada(): void
+    {
+        $this->actingAsAdmin();
+        $cliente = $this->crearCliente();
+        $payload = [...$this->payloadValido($cliente->id), 'tasa_efectiva_anual' => 28.59];
+        unset($payload['tasa_interes']);
+
+        $this->postJson('/api/v1/creditos', $payload)->assertCreated();
+
+        $this->assertDatabaseHas('creditos', ['cliente_id' => $cliente->id, 'tasa_efectiva_anual' => 28.59, 'tasa_interes' => 2.1176]);
+    }
+
+    public function test_rechaza_tasa_efectiva_anual_y_tasa_mensual_a_la_vez_o_ninguna(): void
+    {
+        $this->actingAsAdmin();
+        $cliente = $this->crearCliente();
+
+        $this->postJson('/api/v1/creditos', [...$this->payloadValido($cliente->id), 'tasa_efectiva_anual' => 28.59])
+            ->assertStatus(422)->assertJsonValidationErrors('tasa_efectiva_anual');
+
+        $sinTasa = $this->payloadValido($cliente->id);
+        unset($sinTasa['tasa_interes']);
+
+        $this->postJson('/api/v1/creditos', $sinTasa)
+            ->assertStatus(422)->assertJsonValidationErrors(['tasa_efectiva_anual', 'tasa_interes']);
+        $this->assertDatabaseCount('creditos', 0);
+    }
 }

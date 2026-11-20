@@ -9,6 +9,7 @@ use App\Contabilidad\Services\ComprobanteService;
 use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCredito;
 use App\Creditos\Enums\EstadoCuota;
+use App\Creditos\Enums\TipoPago;
 use App\Creditos\Enums\TipoReprogramacion;
 use App\Creditos\Models\Credito;
 use App\Creditos\Models\Cuota;
@@ -16,7 +17,6 @@ use App\Creditos\Models\ReprogramacionCredito;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Repositories\ReprogramacionCreditoRepository;
-use App\Creditos\Services\AmortizacionCalculator;
 use App\Creditos\Services\OtrosGastosCalculator;
 use App\Creditos\Services\PlanCuotasService;
 use App\Exportacion\Enums\FormatoExportacion;
@@ -293,8 +293,7 @@ class PagoService
 
         $diasTranscurridos = (int) $fechaReferencia->diffInDays($fechaCorte);
 
-        $divisorPeriodo = $credito->tipo_pago->diasPorPeriodo();
-        $tasaDiaria = AmortizacionCalculator::tasaPeriodo((float) $credito->tasa_interes, $credito->tipo_pago) / $divisorPeriodo;
+        $tasaDiaria = $credito->tasaMensual() / 100 / TipoPago::Mensual->diasPorPeriodo();
 
         $interes = $capitalPendiente->multiplicarPorTasa($tasaDiaria * $diasTranscurridos);
         $otrosGastos = $this->otrosGastosLiquidacion($credito);
@@ -581,7 +580,7 @@ class PagoService
             $credito,
             $siguientes,
             $capitalSiguiente->restar($abono),
-            (float) $credito->tasa_interes,
+            $credito->tasaMensual(),
             $siguientes->map(fn (Cuota $cuota) => $cuota->fecha_vencimiento->toDateString())->all(),
             $siguientes->max('numero_cuota') + 1,
         );
@@ -648,7 +647,7 @@ class PagoService
     private function ajustarOtrosGastosRestantes(Credito $credito): void
     {
         $saldo = $this->capitalPendienteReal($credito);
-        $otrosAjustados = OtrosGastosCalculator::valorPorCuota($saldo, (float) $credito->gastos_administracion_pct);
+        $otrosAjustados = OtrosGastosCalculator::valorPorCuota($saldo, (float) $credito->gastos_administracion_pct, $credito->tipo_pago);
 
         foreach ($this->cuotas->pendientesOrdenadasParaActualizar($credito->id) as $cuota) {
             // Una cuota con pago parcial en curso conserva su valor: cambiarlo a mitad de pago alteraría lo ya abonado.

@@ -15,4 +15,10 @@ enum TipoPago: string
             self::Quincenal => 15,
         };
     }
+
+    /** Cuántas cuotas cobran un mes de amortización: la tasa y los gastos de administración son mensuales. */
+    public function cuotasPorMes(): int
+    {
+        return intdiv(self::Mensual->diasPorPeriodo(), $this->diasPorPeriodo());
+    }
 }

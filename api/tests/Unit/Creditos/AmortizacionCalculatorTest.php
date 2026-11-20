@@ -93,38 +93,106 @@ class AmortizacionCalculatorTest extends TestCase
         $this->assertSame(['2026-02-28', '2026-03-31', '2026-04-30', '2026-05-31'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
     }
 
-    /** 1000 al 10 %: el periodo normal cobra 100 de interés; 15 de 30 días cobran 50. El capital no cambia. */
-    public function test_con_primer_vencimiento_prorratea_el_interes_de_la_primera_cuota(): void
+    /** El primer vencimiento solo mueve las fechas: el primer mes cobra su interés completo. */
+    public function test_el_primer_vencimiento_cambia_las_fechas_pero_no_el_interes(): void
     {
         $normal = AmortizacionCalculator::calcular(Dinero::desdePesos(1000), 10, 3, TipoPago::Mensual, '2026-01-01');
-        $prorrateado = AmortizacionCalculator::calcular(Dinero::desdePesos(1000), 10, 3, TipoPago::Mensual, '2026-01-01', '2026-01-16');
+        $corrido = AmortizacionCalculator::calcular(Dinero::desdePesos(1000), 10, 3, TipoPago::Mensual, '2026-01-01', '2026-01-16');
 
-        $primera = $prorrateado['cuotas'][0];
-        $this->assertSame('2026-01-16', $primera['fecha_vencimiento']);
-        $this->assertSame(5000, $primera['valor_interes']->centavos());
-        $this->assertSame($normal['cuotas'][0]['valor_capital']->centavos(), $primera['valor_capital']->centavos());
-        $this->assertSame(30211 + 5000, $primera['valor']->centavos());
-        $this->assertSame(['2026-01-16', '2026-02-16', '2026-03-16'], array_column($prorrateado['cuotas'], 'fecha_vencimiento'));
-        $this->assertSame($normal['valor_total']->centavos() - 5000, $prorrateado['valor_total']->centavos());
-        $this->assertSame(0, end($prorrateado['cuotas'])['saldo_capital']->centavos());
+        $this->assertSame(['2026-01-16', '2026-02-16', '2026-03-16'], array_column($corrido['cuotas'], 'fecha_vencimiento'));
+        $this->assertSame(10000, $corrido['cuotas'][0]['valor_interes']->centavos());
+        $this->assertSame($normal['valor_total']->centavos(), $corrido['valor_total']->centavos());
     }
 
-    public function test_el_primer_vencimiento_de_siempre_no_cambia_el_plan(): void
+    /** La primera quincena puede vencer a 11 o a 19 días del desembolso: el primer mes siempre cobra su interés completo. */
+    public function test_quincenal_cobra_el_primer_mes_completo_sin_importar_los_dias_del_desembolso(): void
     {
-        $normal = AmortizacionCalculator::calcular(Dinero::desdePesos(1000), 10, 3, TipoPago::Mensual, '2026-01-01');
-        $igual = AmortizacionCalculator::calcular(Dinero::desdePesos(1000), 10, 3, TipoPago::Mensual, '2026-01-01', '2026-02-01');
+        $prestamo = Dinero::desdePesos(300000);
 
-        $this->assertSame($normal['valor_total']->centavos(), $igual['valor_total']->centavos());
-        $this->assertSame(10000, $igual['cuotas'][0]['valor_interes']->centavos());
+        foreach (['2026-01-01', '2026-01-12', '2026-01-20'] as $desembolso) {
+            $resultado = AmortizacionCalculator::calcular($prestamo, 3, 4, TipoPago::Quincenal, $desembolso);
+
+            $this->assertSame($prestamo->multiplicarPorTasa(0.03)->centavos(), $this->interesDelPrimerMes($resultado), "Desembolso {$desembolso}");
+        }
     }
 
     public function test_quincenal_con_primer_vencimiento_sigue_el_15_y_el_fin_de_mes_desde_esa_fecha(): void
     {
         $resultado = AmortizacionCalculator::calcular(Dinero::desdePesos(300000), 3, 4, TipoPago::Quincenal, '2026-01-01', '2026-01-31');
-        $tasaQuincenal = AmortizacionCalculator::tasaPeriodo(3, TipoPago::Quincenal);
 
         $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28', '2026-03-15'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
-        $this->assertSame(Dinero::desdePesos(300000)->multiplicarPorTasa($tasaQuincenal * 30 / 15)->centavos(), $resultado['cuotas'][0]['valor_interes']->centavos());
+        $this->assertSame(Dinero::desdePesos(300000)->multiplicarPorTasa(0.03)->centavos(), $this->interesDelPrimerMes($resultado));
+    }
+
+    private function interesDelPrimerMes(array $resultado): int
+    {
+        return $resultado['cuotas'][0]['valor_interes']->sumar($resultado['cuotas'][1]['valor_interes'])->centavos();
+    }
+
+    /** 28,59 % EA equivale a 2,117600086… % mensual, al último decimal. */
+    public function test_la_tasa_mensual_sale_de_la_efectiva_anual_como_en_la_tabla_de_dda(): void
+    {
+        $this->assertEqualsWithDelta(2.117600086268867, AmortizacionCalculator::tasaMensualDesdeEfectivaAnual(28.59), 1e-12);
+        $this->assertSame(0.0, AmortizacionCalculator::tasaMensualDesdeEfectivaAnual(0));
+    }
+
+    /**
+     * Caso de referencia de DDA: 22.000.000 al 28,59 % EA, 24 meses
+     * cobrados en 48 quincenas. Cuota mensual 1.178.717,24; cada quincena es su mitad, 589.358,62.
+     */
+    public function test_quincenal_reproduce_la_tabla_de_amortizacion_de_dda(): void
+    {
+        $prestamo = Dinero::desdePesos(22000000);
+        $tasa = AmortizacionCalculator::tasaMensualDesdeEfectivaAnual(28.59);
+        $resultado = AmortizacionCalculator::calcular($prestamo, $tasa, 48, TipoPago::Quincenal, '2026-11-20');
+        $cuotas = $resultado['cuotas'];
+
+        $this->assertSame(58935862, $resultado['valor_cuota']->centavos());
+        $this->assertCount(48, $cuotas);
+
+        $this->assertSame(23293601, $cuotas[0]['valor_interes']->centavos());
+        $this->assertSame(35642261, $cuotas[0]['valor_capital']->centavos());
+        $this->assertSame(58935862, $cuotas[0]['valor']->centavos());
+        $this->assertSame(58935862, $cuotas[1]['valor']->centavos());
+
+        foreach (array_slice($cuotas, 0, 46) as $cuota) {
+            $this->assertSame(58935862, $cuota['valor']->centavos(), "Cuota {$cuota['numero_cuota']}");
+        }
+
+        $this->assertSame($prestamo->centavos(), Dinero::sumarVarios(...array_column($cuotas, 'valor_capital'))->centavos());
+        $this->assertSame(0, end($cuotas)['saldo_capital']->centavos());
+    }
+
+    /** Cada par de cuotas quincenales es exactamente una cuota del crédito mensual equivalente: mismo interés total. */
+    public function test_cada_par_quincenal_es_la_cuota_del_mensual_equivalente(): void
+    {
+        $prestamo = Dinero::desdePesos(1000000);
+
+        $mensual = AmortizacionCalculator::calcular($prestamo, 2, 6, TipoPago::Mensual, '2026-01-01');
+        $quincenal = AmortizacionCalculator::calcular($prestamo, 2, 12, TipoPago::Quincenal, '2026-01-01');
+
+        foreach ($mensual['cuotas'] as $mes => $cuotaMensual) {
+            [$primera, $segunda] = array_slice($quincenal['cuotas'], $mes * 2, 2);
+
+            foreach (['valor', 'valor_interes', 'valor_capital'] as $campo) {
+                $this->assertSame($cuotaMensual[$campo]->centavos(), $primera[$campo]->sumar($segunda[$campo])->centavos(), "{$campo} del mes {$mes}");
+            }
+        }
+
+        $this->assertSame($mensual['valor_total']->centavos(), $quincenal['valor_total']->centavos());
+    }
+
+    /** Reprogramación o abono a capital pueden dejar un número impar de quincenas: el último grupo es medio mes. */
+    public function test_quincenal_con_plazo_impar_cobra_medio_mes_al_final_y_salda_el_prestamo(): void
+    {
+        $prestamo = Dinero::desdePesos(300000);
+        $resultado = AmortizacionCalculator::calcular($prestamo, 3, 5, TipoPago::Quincenal, '2026-01-01');
+        $ultima = end($resultado['cuotas']);
+
+        $this->assertCount(5, $resultado['cuotas']);
+        $this->assertSame(0, $ultima['saldo_capital']->centavos());
+        $this->assertSame($resultado['cuotas'][3]['saldo_capital']->multiplicarPorTasa(0.03 / 2)->centavos(), $ultima['valor_interes']->centavos());
+        $this->assertSame($prestamo->centavos(), Dinero::sumarVarios(...array_column($resultado['cuotas'], 'valor_capital'))->centavos());
     }
 
     public function test_quincenal_vence_el_15_y_el_ultimo_dia_de_cada_mes(): void
@@ -134,25 +202,12 @@ class AmortizacionCalculatorTest extends TestCase
         $this->assertSame(['2026-01-15', '2026-01-31', '2026-02-15', '2026-02-28', '2026-03-15'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
     }
 
-    /** Desembolso el 20: la primera cuota vence el 31 (11 días) y cobra 11/15 del interés del periodo. */
-    public function test_quincenal_prorratea_el_interes_de_la_primera_cuota_por_los_dias_reales(): void
-    {
-        $resultado = AmortizacionCalculator::calcular(Dinero::desdePesos(300000), 3, 3, TipoPago::Quincenal, '2026-01-20');
-        $tasaQuincenal = AmortizacionCalculator::tasaPeriodo(3, TipoPago::Quincenal);
-
-        $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
-        $this->assertSame(Dinero::desdePesos(300000)->multiplicarPorTasa($tasaQuincenal * 11 / 15)->centavos(), $resultado['cuotas'][0]['valor_interes']->centavos());
-        $this->assertSame(0, end($resultado['cuotas'])['saldo_capital']->centavos());
-    }
-
-    /** Desembolso el 12: el 15 queda a 3 días, así que la primera cuota pasa al 31 y cobra 19/15 del interés. */
+    /** Desembolso el 12: el 15 queda a 3 días, así que la primera cuota pasa al 31. */
     public function test_quincenal_no_cobra_la_primera_cuota_a_pocos_dias_del_desembolso(): void
     {
         $resultado = AmortizacionCalculator::calcular(Dinero::desdePesos(300000), 3, 3, TipoPago::Quincenal, '2026-01-12');
-        $tasaQuincenal = AmortizacionCalculator::tasaPeriodo(3, TipoPago::Quincenal);
 
         $this->assertSame(['2026-01-31', '2026-02-15', '2026-02-28'], array_column($resultado['cuotas'], 'fecha_vencimiento'));
-        $this->assertSame(Dinero::desdePesos(300000)->multiplicarPorTasa($tasaQuincenal * 19 / 15)->centavos(), $resultado['cuotas'][0]['valor_interes']->centavos());
         $this->assertSame(0, end($resultado['cuotas'])['saldo_capital']->centavos());
     }
 
@@ -179,57 +234,5 @@ class AmortizacionCalculatorTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         AmortizacionCalculator::calcular(Dinero::desdePesos(300000), 3, 3, TipoPago::Quincenal, '2026-01-01', '2026-01-10');
-    }
-
-    /**
-     * `tasa_interes` siempre se captura mensual: para un crédito quincenal, la tasa del periodo debe ser menor a la
-     * mensual (nunca igual, que era el bug — cobrar la tasa mensual completa cada quincena) y nunca negativa.
-     */
-    public function test_tasa_periodo_quincenal_es_menor_a_la_mensual_para_la_misma_tasa_capturada(): void
-    {
-        foreach ([2.12, 3, 10] as $tasaMensual) {
-            $iMensual = AmortizacionCalculator::tasaPeriodo($tasaMensual, TipoPago::Mensual);
-            $iQuincenal = AmortizacionCalculator::tasaPeriodo($tasaMensual, TipoPago::Quincenal);
-
-            $this->assertSame($tasaMensual / 100, $iMensual);
-            $this->assertGreaterThan(0, $iQuincenal);
-            $this->assertLessThan($iMensual, $iQuincenal);
-        }
-
-        $this->assertSame(0.0, AmortizacionCalculator::tasaPeriodo(0, TipoPago::Quincenal));
-    }
-
-    /**
-     * La equivalencia es por tasas compuestas: componer la tasa quincenal dos periodos (un mes) debe reproducir
-     * exactamente la tasa mensual capturada, no la mitad de ella (una simple división entre 2 no cumple esto).
-     */
-    public function test_tasa_quincenal_compuesta_dos_veces_reproduce_la_tasa_mensual(): void
-    {
-        foreach ([2.12, 3, 10] as $tasaMensual) {
-            $iMensual = AmortizacionCalculator::tasaPeriodo($tasaMensual, TipoPago::Mensual);
-            $iQuincenal = AmortizacionCalculator::tasaPeriodo($tasaMensual, TipoPago::Quincenal);
-
-            $this->assertEqualsWithDelta($iMensual, (1 + $iQuincenal) ** 2 - 1, 1e-12);
-        }
-    }
-
-    /**
-     * Para el mismo plazo en meses, el total de intereses de un crédito quincenal no puede superar al de su
-     * equivalente mensual: amortizar el capital en más cuotas (quincenales) lo reduce más rápido, así que expone
-     * menos saldo al interés — es la consecuencia esperada de usar la tasa compuesta equivalente, no una
-     * inconsistencia. (No son iguales "dentro de redondeo": son schedules de pago distintos a propósito.)
-     */
-    public function test_quincenal_no_cobra_mas_interes_total_que_su_equivalente_mensual_al_mismo_plazo(): void
-    {
-        $prestamo = Dinero::desdePesos(1000000);
-
-        $mensual = AmortizacionCalculator::calcular($prestamo, 2, 6, TipoPago::Mensual, '2026-01-01', prorratearPrimera: false);
-        $quincenal = AmortizacionCalculator::calcular($prestamo, 2, 12, TipoPago::Quincenal, '2026-01-01', prorratearPrimera: false);
-
-        $interesMensual = $mensual['valor_total']->restar($prestamo);
-        $interesQuincenal = $quincenal['valor_total']->restar($prestamo);
-
-        $this->assertGreaterThan(0, $interesQuincenal->centavos());
-        $this->assertLessThan($interesMensual->centavos(), $interesQuincenal->centavos());
     }
 }

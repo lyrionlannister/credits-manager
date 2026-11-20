@@ -11,10 +11,10 @@ use App\Creditos\Enums\TipoPago;
  */
 class OtrosGastosCalculator
 {
-    /** Capital inicial × porcentaje: el mismo valor en todas las cuotas, incluida la última. */
-    public static function valorPorCuota(Dinero $capitalInicial, float $porcentaje): Dinero
+    /** Capital inicial × porcentaje mensual, repartido entre las cuotas del mes: el mismo valor en todas las cuotas. */
+    public static function valorPorCuota(Dinero $capitalInicial, float $porcentaje, TipoPago $tipoPago): Dinero
     {
-        return $capitalInicial->multiplicarPorTasa($porcentaje / 100);
+        return $capitalInicial->multiplicarPorTasa($porcentaje / 100 / $tipoPago->cuotasPorMes());
     }
 
     /**

@@ -18,7 +18,12 @@ export const CreditInfoGrid: FC<CreditInfoGridProps> = ({ credito }) => (
         </div>
         <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">Tasa de interés</p>
-            <p className="font-medium text-gray-800 dark:text-white/90">{parseFloat(credito.tasa_interes).toFixed(2)}%</p>
+            <p className="font-medium text-gray-800 dark:text-white/90">
+                {parseFloat(credito.tasa_interes).toFixed(2)}% mensual
+                {credito.tasa_efectiva_anual && (
+                    <span className="font-normal text-gray-500 dark:text-gray-400"> · {parseFloat(credito.tasa_efectiva_anual).toFixed(2)}% EA</span>
+                )}
+            </p>
         </div>
         <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">Plazo</p>

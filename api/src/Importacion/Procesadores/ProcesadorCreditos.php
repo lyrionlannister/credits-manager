@@ -124,7 +124,7 @@ final class ProcesadorCreditos implements ProcesadorFila
             ]);
 
             $cuotasConOtrosGastos = array_map(
-                fn (array $cuota) => [...$cuota, 'valor_otros_gastos' => OtrosGastosCalculator::valorPorCuota($valor, $porcentajeGastos)],
+                fn (array $cuota) => [...$cuota, 'valor_otros_gastos' => OtrosGastosCalculator::valorPorCuota($valor, $porcentajeGastos, $tipoPago)],
                 $calculo['cuotas'],
             );
 

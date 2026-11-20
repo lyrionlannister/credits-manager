@@ -485,6 +485,7 @@ return [
         'credito_origen_id' => 'crédito que refinancia',
         'valor_prestamo' => 'valor del préstamo',
         'tasa_interes' => 'tasa de interés',
+        'tasa_efectiva_anual' => 'tasa efectiva anual',
         'plazo' => 'plazo',
         'tipo_pago' => 'tipo de pago',
         'fecha_desembolso' => 'fecha de desembolso',

@@ -64,7 +64,7 @@ class CreditoService
             }
 
             $capital = Dinero::sumarVarios(...$reprogramables->pluck('valor_capital')->all());
-            $tasa = (float) ($datos['tasa_interes'] ?? $credito->tasa_interes);
+            $tasa = isset($datos['tasa_efectiva_anual']) || isset($datos['tasa_interes']) ? $this->tasaMensualDe($datos) : $credito->tasaMensual();
             $cuotasRestantes = (int) $datos['cuotas_restantes'];
             $primerVencimiento = CarbonImmutable::parse($datos['fecha_primer_vencimiento']);
 
@@ -86,10 +86,13 @@ class CreditoService
                 // Misma base que `conOtrosGastos()`, `actualizarGastosAdministracion()` y el accessor `valorCuotaTotal`
                 // del modelo: el valor prestado original, nunca el saldo pendiente (si no, el total del crédito que
                 // se muestra deja de coincidir con lo que quedó guardado en las cuotas nuevas).
-                OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, (float) $credito->gastos_administracion_pct),
+                OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, (float) $credito->gastos_administracion_pct, $credito->tipo_pago),
             );
             $this->planCuotas->recalcularSaldoCapital($credito);
             $credito = $this->planCuotas->actualizarTotalesDelCredito($credito, $calculo['valor_cuota'], $tasa);
+            if (isset($datos['tasa_efectiva_anual']) || isset($datos['tasa_interes'])) {
+                $credito = $this->creditos->actualizar($credito, ['tasa_efectiva_anual' => $datos['tasa_efectiva_anual'] ?? null]);
+            }
 
             $reprogramacion = $this->reprogramaciones->crear([
                 'credito_id' => $credito->id,
@@ -151,6 +154,7 @@ class CreditoService
             [$valorPrestamo, $saldoTomado] = $this->valorDelPrestamo($datos);
             $this->exigirSaldoRefinanciadoVigente($datos, $saldoTomado);
             $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? 0);
+            $tasa = $this->tasaMensualDe($datos);
 
             $credito = $this->creditos->crear([
                 'cliente_id' => $datos['cliente_id'],
@@ -158,7 +162,8 @@ class CreditoService
                 'credito_origen_id' => $datos['credito_origen_id'] ?? null,
                 'valor_prestamo' => $valorPrestamo,
                 'saldo_refinanciado' => $saldoTomado,
-                'tasa_interes' => $datos['tasa_interes'],
+                'tasa_interes' => round($tasa, 6),
+                'tasa_efectiva_anual' => $datos['tasa_efectiva_anual'] ?? null,
                 'gastos_administracion_pct' => $porcentajeGastos,
                 'plazo' => $datos['plazo'],
                 'tipo_pago' => $datos['tipo_pago'],
@@ -171,14 +176,14 @@ class CreditoService
 
             $resultado = AmortizacionCalculator::calcular(
                 $valorPrestamo,
-                (float) $datos['tasa_interes'],
+                $tasa,
                 (int) $datos['plazo'],
                 TipoPago::from($datos['tipo_pago']),
                 $datos['fecha_desembolso'],
                 $datos['fecha_primer_vencimiento'] ?? null,
             );
 
-            $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos));
+            $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos, $credito->tipo_pago));
 
             $this->creditos->actualizar($credito, [
                 'valor_cuota' => $resultado['valor_cuota'],
@@ -200,19 +205,24 @@ class CreditoService
     public function previsualizarCredito(array $datos): array
     {
         [$valorPrestamo, $saldoTomado] = $this->valorDelPrestamo($datos);
-        $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? 0);
 
+        return $this->previsualizacion($valorPrestamo, $saldoTomado, (float) ($datos['gastos_administracion_pct'] ?? 0), $datos);
+    }
+
+    private function previsualizacion(Dinero $valorPrestamo, ?Dinero $saldoTomado, float $porcentajeGastos, array $datos): array
+    {
         $plazo = (int) $datos['plazo'];
+        $tipoPago = TipoPago::from($datos['tipo_pago']);
         $resultado = AmortizacionCalculator::calcular(
             $valorPrestamo,
-            (float) $datos['tasa_interes'],
+            $this->tasaMensualDe($datos),
             $plazo,
-            TipoPago::from($datos['tipo_pago']),
+            $tipoPago,
             $datos['fecha_desembolso'],
             $datos['fecha_primer_vencimiento'] ?? null,
         );
 
-        $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($valorPrestamo, $porcentajeGastos);
+        $otrosPorCuota = OtrosGastosCalculator::valorPorCuota($valorPrestamo, $porcentajeGastos, $tipoPago);
 
         return [
             'valor_prestamo' => $valorPrestamo,
@@ -220,8 +230,9 @@ class CreditoService
             'valor_cuota' => $resultado['valor_cuota'],
             'valor_total' => $resultado['valor_total'],
             'valor_total_con_otros' => $resultado['valor_total']->sumar(Dinero::sumarVarios(...array_fill(0, $plazo, $otrosPorCuota))),
+            'tasa_interes' => number_format($this->tasaMensualDe($datos), 6, '.', ''),
             'interes_total' => $resultado['valor_total']->restar($valorPrestamo),
-            'cuotas' => $this->conValorTotalCuota($this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos)),
+            'cuotas' => $this->conValorTotalCuota($this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos, $tipoPago)),
         ];
     }
 
@@ -234,39 +245,31 @@ class CreditoService
     {
         return DB::transaction(function () use ($credito, $datos) {
             $credito = $this->creditos->bloquear($credito->id);
-
-            if (! in_array($credito->estado, [EstadoCredito::Solicitado, EstadoCredito::Aprobado], true)) {
-                throw ValidationException::withMessages(['credito' => __('validation.custom.credito.no_editable')]);
-            }
-
-            $valorPrestamo = $credito->tipo_credito === TipoCredito::Refinanciacion
-                ? ($credito->saldo_refinanciado ?? Dinero::cero())->sumar(Dinero::desdePesos($datos['valor_adicional']))
-                : Dinero::desdePesos($datos['valor_prestamo']);
-
-            if (! $valorPrestamo->esPositivo()) {
-                throw ValidationException::withMessages(['valor_adicional' => __('validation.custom.valor_adicional.sin_valor')]);
-            }
+            $this->exigirEditable($credito);
+            $valorPrestamo = $this->valorPrestamoEditado($credito, $datos);
 
             $porcentajeGastos = (float) ($datos['gastos_administracion_pct'] ?? $credito->gastos_administracion_pct);
 
             $anteriores = $this->auditoria->instantanea($credito);
             $cuotasReemplazadas = $this->cuotas->todasOrdenadasParaActualizar($credito->id)->count();
 
+            $tipoPago = TipoPago::from($datos['tipo_pago']);
             $resultado = AmortizacionCalculator::calcular(
                 $valorPrestamo,
-                (float) $datos['tasa_interes'],
+                $this->tasaMensualDe($datos),
                 (int) $datos['plazo'],
-                TipoPago::from($datos['tipo_pago']),
+                $tipoPago,
                 $datos['fecha_desembolso'],
                 $datos['fecha_primer_vencimiento'] ?? null,
             );
 
             $this->cuotas->eliminarTodasDeCredito($credito->id);
-            $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos));
+            $this->cuotas->crearVarias($credito->id, $this->conOtrosGastos($resultado['cuotas'], $valorPrestamo, $porcentajeGastos, $tipoPago));
 
             $credito = $this->creditos->actualizar($credito, [
                 'valor_prestamo' => $valorPrestamo,
-                'tasa_interes' => $datos['tasa_interes'],
+                'tasa_interes' => round($this->tasaMensualDe($datos), 6),
+                'tasa_efectiva_anual' => $datos['tasa_efectiva_anual'] ?? null,
                 'gastos_administracion_pct' => $porcentajeGastos,
                 'plazo' => (int) $datos['plazo'],
                 'tipo_pago' => $datos['tipo_pago'],
@@ -303,7 +306,7 @@ class CreditoService
             $this->exigirEstado($credito, EstadoCredito::Desembolsado);
 
             $anteriores = $this->auditoria->instantanea($credito);
-            $otrosGastos = OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, $porcentaje);
+            $otrosGastos = OtrosGastosCalculator::valorPorCuota($credito->valor_prestamo, $porcentaje, $credito->tipo_pago);
 
             $pendientes = $this->cuotas->pendientesOrdenadasParaActualizar($credito->id);
             foreach ($pendientes as $cuota) {
@@ -328,10 +331,39 @@ class CreditoService
         });
     }
 
-    /** Cada cuota lleva el mismo valor de otros gastos: capital inicial × porcentaje, sin tocar capital ni interés. */
-    private function conOtrosGastos(array $cuotas, Dinero $capitalInicial, float $porcentaje): array
+    private function exigirEditable(Credito $credito): void
     {
-        $otrosGastos = OtrosGastosCalculator::valorPorCuota($capitalInicial, $porcentaje);
+        if (! in_array($credito->estado, [EstadoCredito::Solicitado, EstadoCredito::Aprobado], true)) {
+            throw ValidationException::withMessages(['credito' => __('validation.custom.credito.no_editable')]);
+        }
+    }
+
+    /** En una refinanciación el préstamo es el saldo tomado al crearla (no el actual del original) más el valor adicional. */
+    private function valorPrestamoEditado(Credito $credito, array $datos): Dinero
+    {
+        $valorPrestamo = $credito->tipo_credito === TipoCredito::Refinanciacion
+            ? ($credito->saldo_refinanciado ?? Dinero::cero())->sumar(Dinero::desdePesos($datos['valor_adicional']))
+            : Dinero::desdePesos($datos['valor_prestamo']);
+
+        if (! $valorPrestamo->esPositivo()) {
+            throw ValidationException::withMessages(['valor_adicional' => __('validation.custom.valor_adicional.sin_valor')]);
+        }
+
+        return $valorPrestamo;
+    }
+
+    /** La tasa se pacta en EA y la mensual sale de ella sin redondear; sin EA, la mensual enviada tal cual (importaciones, integraciones). */
+    private function tasaMensualDe(array $datos): float
+    {
+        return isset($datos['tasa_efectiva_anual'])
+            ? AmortizacionCalculator::tasaMensualDesdeEfectivaAnual((float) $datos['tasa_efectiva_anual'])
+            : (float) $datos['tasa_interes'];
+    }
+
+    /** Cada cuota lleva el mismo valor de otros gastos: capital inicial × porcentaje, sin tocar capital ni interés. */
+    private function conOtrosGastos(array $cuotas, Dinero $capitalInicial, float $porcentaje, TipoPago $tipoPago): array
+    {
+        $otrosGastos = OtrosGastosCalculator::valorPorCuota($capitalInicial, $porcentaje, $tipoPago);
 
         return array_map(fn (array $cuota) => [...$cuota, 'valor_otros_gastos' => $otrosGastos], $cuotas);
     }
