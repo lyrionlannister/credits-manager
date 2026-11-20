@@ -17,6 +17,8 @@ export type ApiCreditPreview = {
     valor_cuota: string;
     valor_total: string;
     valor_total_con_otros: string;
+    /** Tasa mensual (%) usada en el cálculo, derivada de la EA. Decimal string. */
+    tasa_interes: string;
     interes_total: string;
     cuotas: ApiPreviewInstallment[];
 };

@@ -6,6 +6,7 @@ export type CreditInfoGridProps = {
     credito: {
         cliente?: ApiClient;
         tasa_interes: string;
+        tasa_efectiva_anual?: string | null;
         plazo: number;
         tipo_pago: PaymentType;
         fecha_desembolso: string;

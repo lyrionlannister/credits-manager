@@ -20,20 +20,18 @@ use InvalidArgumentException;
  * del período" se redondea una única vez a centavo vía `Dinero`, nunca se acumula
  * error de flotante en sumas/restas posteriores (esas son aritmética entera exacta).
  *
- * `$tasaInteres` siempre es la tasa mensual capturada, nunca la tasa del periodo: `tasaPeriodo()` la convierte según
- * `$tipoPago` antes de usarla como `$i` (ver su docblock).
+ * `$tasaInteres` siempre es la tasa mensual y la amortización siempre es mensual (así amortiza DDA): en Quincenal cada
+ * mes se cobra en dos cuotas iguales, la mitad de la cuota y del interés de ese mes. No hay tasa quincenal ni
+ * amortización quincenal independiente.
  *
- * Diferencias deliberadas con el legado: el mes se suma sin desbordar (un desembolso del 31 de enero vence el 28 de
- * febrero, no el 3 de marzo) y, si se da la fecha del primer vencimiento, el interés de la primera cuota se prorratea
- * por los días reales desde el desembolso; el capital de cada cuota no cambia.
+ * Cada mes cobra su interés completo sin importar los días reales entre el desembolso y la primera
+ * cuota: las fechas solo deciden cuándo vence cada cuota, nunca cuánto cobra. El mes se suma sin desbordar (un
+ * desembolso del 31 de enero vence el 28 de febrero, no el 3 de marzo).
  *
  * Quincenal: las cuotas vencen en días fijos, el 15 y el último día de cada mes (decisión de DDA), no cada 15 días.
  * El primer vencimiento es el siguiente de esos días después del desembolso, o el que le sigue si quedan menos de
- * `CreditoConstants::DIAS_MINIMOS_PRIMERA_CUOTA_QUINCENAL` días, así que el primer periodo casi nunca dura 15 días
- * exactos: su interés siempre se prorratea por los días reales.
- *
- * `$prorratearPrimera = false` cobra el periodo completo en la primera cuota: lo usa quien rehace cuotas de un plan
- * en curso, donde la primera fecha no es la de un desembolso.
+ * `CreditoConstants::DIAS_MINIMOS_PRIMERA_CUOTA_QUINCENAL` días. Las cuotas se agrupan por pares desde la primera;
+ * con plazo impar (reprogramación, abono a capital) el último grupo es medio mes.
  */
 class AmortizacionCalculator
 {
@@ -44,16 +42,14 @@ class AmortizacionCalculator
         TipoPago $tipoPago,
         string $fechaDesembolso,
         ?string $fechaPrimerVencimiento = null,
-        bool $prorratearPrimera = true,
     ): array {
-        $i = self::tasaPeriodo($tasaInteres, $tipoPago);
+        $i = $tasaInteres / 100;
+        $cuotasPorMes = $tipoPago->cuotasPorMes();
+        $meses = $plazo / $cuotasPorMes;
 
-        if ($i > 0) {
-            $factorCuota = $i / (1 - (1 + $i) ** -$plazo);
-            $valorCuota = $valorPrestamo->multiplicarPorTasa($factorCuota);
-        } else {
-            $valorCuota = $valorPrestamo->dividirEntre($plazo);
-        }
+        $cuotaMensual = $i > 0
+            ? $valorPrestamo->multiplicarPorTasa($i / (1 - (1 + $i) ** -$meses))
+            : Dinero::sumarVarios(...array_fill(0, $cuotasPorMes, $valorPrestamo->dividirEntre($plazo)));
 
         $desembolso = CarbonImmutable::parse($fechaDesembolso)->startOfDay();
         $primerVencimiento = match (true) {
@@ -66,70 +62,62 @@ class AmortizacionCalculator
             throw new InvalidArgumentException('El primer vencimiento quincenal debe caer el 15 o el último día del mes.');
         }
 
-        // Mensual: el vencimiento de siempre no se prorratea (un mes de 31 días no debe cobrar 31/30 del interés).
-        $prorratear = $prorratearPrimera && ($tipoPago === TipoPago::Quincenal || ! $primerVencimiento->equalTo(self::sumarPeriodos($desembolso, 1, $tipoPago)));
+        $fechas = [];
+        for ($n = 1; $n <= $plazo; $n++) {
+            $fechas[$n] = $tipoPago === TipoPago::Mensual && $fechaPrimerVencimiento === null
+                ? self::sumarPeriodos($desembolso, $n, $tipoPago)
+                : self::sumarPeriodos($primerVencimiento, $n - 1, $tipoPago);
+        }
+
         $saldo = $valorPrestamo;
         $valorTotal = Dinero::cero();
         $cuotas = [];
 
-        for ($n = 1; $n <= $plazo; $n++) {
-            $fechaCuota = $tipoPago === TipoPago::Mensual && $fechaPrimerVencimiento === null
-                ? self::sumarPeriodos($desembolso, $n, $tipoPago)
-                : self::sumarPeriodos($primerVencimiento, $n - 1, $tipoPago);
+        foreach (array_chunk(range(1, $plazo), $cuotasPorMes) as $numeros) {
+            $esUltimoMes = end($numeros) === $plazo;
+            $interesMes = $saldo->multiplicarPorTasa($i * count($numeros) / $cuotasPorMes);
 
-            $interesPeriodo = $saldo->multiplicarPorTasa($i);
-            $interesCobrado = $interesPeriodo;
+            $capitalMes = $esUltimoMes ? $saldo : $cuotaMensual->restar($interesMes);
+            // Se parte la cuota del mes y el capital absorbe el centavo: así las dos quincenas cobran lo mismo.
+            $valores = self::repartir($capitalMes->sumar($interesMes), count($numeros));
+            $intereses = self::repartir($interesMes, count($numeros));
 
-            if ($n === 1 && $prorratear) {
-                $dias = (int) $desembolso->diffInDays($primerVencimiento);
-                $interesCobrado = $saldo->multiplicarPorTasa($i * $dias / $tipoPago->diasPorPeriodo());
+            foreach ($numeros as $posicion => $n) {
+                $capitalEstaCuota = $valores[$posicion]->restar($intereses[$posicion]);
+                $saldo = $saldo->restar($capitalEstaCuota);
+                $valorTotal = $valorTotal->sumar($valores[$posicion]);
+
+                $cuotas[] = [
+                    'numero_cuota' => $n,
+                    'fecha_vencimiento' => $fechas[$n]->format('Y-m-d'),
+                    'valor' => $valores[$posicion],
+                    'valor_interes' => $intereses[$posicion],
+                    'valor_capital' => $capitalEstaCuota,
+                    'saldo_capital' => $saldo->noNegativo(),
+                ];
             }
-
-            if ($n === $plazo) {
-                $capitalPeriodo = $saldo;
-                $valorEstaCuota = $capitalPeriodo->sumar($interesCobrado);
-            } else {
-                $capitalPeriodo = $valorCuota->restar($interesPeriodo);
-                $valorEstaCuota = $capitalPeriodo->sumar($interesCobrado);
-            }
-
-            $interesPeriodo = $interesCobrado;
-
-            $saldo = $saldo->restar($capitalPeriodo);
-            $valorTotal = $valorTotal->sumar($valorEstaCuota);
-
-            $cuotas[] = [
-                'numero_cuota' => $n,
-                'fecha_vencimiento' => $fechaCuota->format('Y-m-d'),
-                'valor' => $valorEstaCuota,
-                'valor_interes' => $interesPeriodo,
-                'valor_capital' => $capitalPeriodo,
-                'saldo_capital' => $saldo->noNegativo(),
-            ];
         }
 
         return [
-            'valor_cuota' => $valorCuota,
+            'valor_cuota' => $cuotaMensual->dividirEntre($cuotasPorMes),
             'valor_total' => $valorTotal,
             'cuotas' => $cuotas,
         ];
     }
 
-    /**
-     * `$tasaMensual` es siempre la tasa mensual capturada (efectiva, no la del periodo): para Quincenal se deriva la
-     * tasa periódica equivalente por equivalencia de tasas compuestas sobre `TipoPago::diasPorPeriodo()`, no
-     * dividiendo entre 2 — así la misma tasa mensual cuesta lo mismo sin importar si el crédito es mensual o
-     * quincenal. Centralizado aquí porque todo caller de `calcular()` recibe `tasa_interes` ya en esa convención.
-     */
-    public static function tasaPeriodo(float $tasaMensual, TipoPago $tipoPago): float
+    /** Tasa mensual equivalente a la efectiva anual, en % y sin redondear: (1 + EA)^(1/12) − 1, igual a `NOMINAL(EA; 12) / 12`. */
+    public static function tasaMensualDesdeEfectivaAnual(float $efectivaAnual): float
     {
-        $iMensual = $tasaMensual / 100;
+        return ((1 + $efectivaAnual / 100) ** (1 / 12) - 1) * 100;
+    }
 
-        if ($tipoPago === TipoPago::Mensual) {
-            return $iMensual;
-        }
+    /** Partes iguales truncadas a centavo; la última absorbe el residuo para que la suma sea exacta. */
+    private static function repartir(Dinero $valor, int $partes): array
+    {
+        $parte = $valor->dividirEntre($partes);
+        $resto = $valor->restar(Dinero::sumarVarios(...array_fill(0, $partes, $parte)));
 
-        return (1 + $iMensual) ** ($tipoPago->diasPorPeriodo() / TipoPago::Mensual->diasPorPeriodo()) - 1;
+        return [...array_fill(0, $partes - 1, $parte), $parte->sumar($resto)];
     }
 
     /** Quincenal: cada periodo salta al siguiente 15 o fin de mes, así que desde cualquier fecha cae en un día fijo. */

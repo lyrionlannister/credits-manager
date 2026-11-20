@@ -194,9 +194,11 @@ Route::middleware(['auth:sanctum', 'debe_cambiar_clave', 'soporte.solo_lectura']
     Route::get('/creditos', [CreditoController::class, 'index'])->middleware('permiso:creditos,listar');
     Route::post('/creditos', [CreditoController::class, 'store'])->middleware('permiso:creditos,crear');
     Route::post('/creditos/previsualizar', [CreditoController::class, 'previsualizar'])->middleware('permiso:creditos,crear');
+    Route::post('/creditos/previsualizar/pdf', [CreditoController::class, 'previsualizarPdf'])->middleware('permiso:creditos,crear');
     Route::post('/creditos/exportar', [CreditoController::class, 'exportar'])->middleware('exportacion:creditos.listado');
     Route::get('/creditos/{credito}', [CreditoController::class, 'show'])->middleware('permiso:creditos,listar');
     Route::patch('/creditos/{credito}', [CreditoController::class, 'update'])->middleware('permiso:creditos,editar');
+    Route::post('/creditos/{credito}/previsualizar', [CreditoController::class, 'previsualizarEdicion'])->middleware('permiso:creditos,editar');
     Route::post('/creditos/{credito}/reprogramacion', [CreditoController::class, 'reprogramar'])->middleware('permiso:creditos,editar');
     Route::patch('/creditos/{credito}/gastos-administracion', [CreditoController::class, 'actualizarGastosAdministracion'])->middleware('permiso:creditos,editar');
     Route::get('/creditos/{credito}/estado-cuenta', [CreditoController::class, 'estadoCuenta'])->middleware('permiso:creditos,listar');

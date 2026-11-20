@@ -48,7 +48,9 @@ class CrearCreditoRequest extends FormRequest
             // Lo que la previsualización mostró como saldo de capital del original: si cambió (p. ej. un pago entre
             // previsualizar y crear), el servidor rechaza la creación en vez de guardar un saldo distinto del aprobado.
             'saldo_refinanciado_previsualizado' => ['required_if:tipo_credito,refinanciacion', 'prohibited_unless:tipo_credito,refinanciacion', 'numeric', 'min:0'],
-            'tasa_interes' => ['required', 'numeric', 'min:0'],
+            // La tasa se pacta en EA y la mensual sale de ella; la mensual directa queda para importaciones e integraciones.
+            'tasa_efectiva_anual' => ['required_without:tasa_interes', 'prohibits:tasa_interes', 'nullable', 'numeric', 'min:0', 'max:999'],
+            'tasa_interes' => ['required_without:tasa_efectiva_anual', 'nullable', 'numeric', 'min:0'],
             'gastos_administracion_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'plazo' => ['required', 'integer', 'min:1'],
             'tipo_pago' => ['required', Rule::enum(TipoPago::class)],

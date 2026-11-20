@@ -5,12 +5,10 @@ import { CreateCreditForm } from '../components/create-credit-form';
 
 export const CreateCreditPage: FC = () => {
     return (
-        <div className="flex min-h-full flex-col pb-6">
+        <div className="flex min-h-full flex-col">
             <PageBreadcrumb pageTitle="Nuevo crédito" />
 
-            <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-6 md:p-8 dark:border-gray-800 dark:bg-white/3">
-                <CreateCreditForm />
-            </div>
+            <CreateCreditForm />
         </div>
     );
 };

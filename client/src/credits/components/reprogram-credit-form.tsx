@@ -9,6 +9,8 @@ import { Input } from '@ui/forms/components/input';
 import { Label } from '@ui/forms/components/label';
 import { Spinner } from '@ui/spinner/components/spinner';
 import { CalendarClock } from 'lucide-react';
+import { annualRateOfCredit } from '../utils/annual-rate-of-credit';
+import { monthlyRateFromAnnual } from '../utils/monthly-rate-from-annual';
 import type { ReprogramCreditFormProps } from '../props/reprogram-credit-form-props';
 
 export const ReprogramCreditForm: FC<ReprogramCreditFormProps> = ({ credito }) => {
@@ -16,7 +18,7 @@ export const ReprogramCreditForm: FC<ReprogramCreditFormProps> = ({ credito }) =
     const { sendRequest } = useSendRequest();
 
     const [cuotasRestantes, setCuotasRestantes] = useState('');
-    const [tasaInteres, setTasaInteres] = useState(credito.tasa_interes);
+    const [tasaEfectivaAnual, setTasaEfectivaAnual] = useState(() => annualRateOfCredit(credito));
     const [fechaPrimerVencimiento, setFechaPrimerVencimiento] = useState('');
     const [motivo, setMotivo] = useState('');
 
@@ -33,7 +35,8 @@ export const ReprogramCreditForm: FC<ReprogramCreditFormProps> = ({ credito }) =
                 method: 'POST',
                 body: {
                     cuotas_restantes: Number(cuotasRestantes),
-                    tasa_interes: tasaInteres,
+                    // Sin tocar la tasa, la reprogramación sigue con la del crédito (la mensual exacta si es anterior a la EA).
+                    ...(tasaEfectivaAnual === annualRateOfCredit(credito) ? {} : { tasa_efectiva_anual: tasaEfectivaAnual }),
                     fecha_primer_vencimiento: fechaPrimerVencimiento,
                     motivo,
                 },
@@ -71,16 +74,17 @@ export const ReprogramCreditForm: FC<ReprogramCreditFormProps> = ({ credito }) =
                 </div>
 
                 <div>
-                    <Label htmlFor="tasa-interes">Tasa de interés (% Mensual)</Label>
+                    <Label htmlFor="tasa-interes">Tasa de interés (% EA)</Label>
                     <Input
                         id="tasa-interes"
                         name="tasa-interes"
                         type="number"
-                        step={0.001}
+                        step={0.0001}
                         min="0"
                         required
-                        value={tasaInteres}
-                        onChange={(event) => setTasaInteres(event.target.value)}
+                        value={tasaEfectivaAnual}
+                        onChange={(event) => setTasaEfectivaAnual(event.target.value)}
+                        hint={monthlyRateFromAnnual(tasaEfectivaAnual) ? `Equivale a ${monthlyRateFromAnnual(tasaEfectivaAnual)} % mensual` : undefined}
                     />
                 </div>
 

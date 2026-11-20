@@ -30,6 +30,7 @@ class PlanCuotasService
             'credito' => [
                 'plazo' => $credito->plazo,
                 'tasa_interes' => (string) $credito->tasa_interes,
+                'tasa_efectiva_anual' => $credito->tasa_efectiva_anual === null ? null : (string) $credito->tasa_efectiva_anual,
                 'valor_cuota' => $credito->valor_cuota->centavos(),
                 'valor_total' => $credito->valor_total->centavos(),
             ],
@@ -79,6 +80,8 @@ class PlanCuotasService
         $this->creditos->actualizar($credito, [
             'plazo' => $foto['credito']['plazo'],
             'tasa_interes' => $foto['credito']['tasa_interes'],
+            // Las fotos anteriores a la EA no la traen: el crédito sigue con la que tiene.
+            ...(array_key_exists('tasa_efectiva_anual', $foto['credito']) ? ['tasa_efectiva_anual' => $foto['credito']['tasa_efectiva_anual']] : []),
             'valor_cuota' => Dinero::desdeCentavos($foto['credito']['valor_cuota']),
             'valor_total' => Dinero::desdeCentavos($foto['credito']['valor_total']),
         ]);
@@ -96,7 +99,7 @@ class PlanCuotasService
      */
     public function rehacerCuotas(Credito $credito, Collection $reemplazables, Dinero $capital, float $tasa, array $fechas, int $siguienteNumero, ?Dinero $otrosPorCuota = null): array
     {
-        $calculo = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0], prorratearPrimera: false);
+        $calculo = AmortizacionCalculator::calcular($capital, $tasa, count($fechas), $credito->tipo_pago, $fechas[0]);
         $plan = $calculo['cuotas'];
         $hoy = CarbonImmutable::now('America/Bogota')->startOfDay();
         $sinCapital = ! $capital->esPositivo();
