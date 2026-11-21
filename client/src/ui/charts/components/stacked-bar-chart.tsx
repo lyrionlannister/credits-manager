@@ -32,5 +32,10 @@ export const StackedBarChart: FC<StackedBarChartProps> = ({ categories, series, 
         tooltip: { x: { show: false }, y: { formatter: formatear } },
     };
 
-    return <Chart type="bar" height={height} series={series.map(({ name, data }) => ({ name, data }))} options={options} />;
+    // ApexCharts redibuja con retardo tras un resize: sin recorte, el SVG viejo desborda la card un instante.
+    return (
+        <div className="min-w-0 overflow-hidden">
+            <Chart type="bar" height={height} series={series.map(({ name, data }) => ({ name, data }))} options={options} />
+        </div>
+    );
 };
