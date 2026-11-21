@@ -15,6 +15,7 @@ use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\Concerns\CreatesContabilidadFixtures;
 use Tests\Concerns\CreatesCreditFixtures;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\TestCase;
 
 class ReciboCajaTest extends TestCase
@@ -23,6 +24,7 @@ class ReciboCajaTest extends TestCase
     use AfirmaAuditoria;
     use CreatesContabilidadFixtures;
     use CreatesCreditFixtures;
+    use LeeFlujosPdf;
     use RefreshDatabase;
 
     /** Crédito desembolsado con dos cuotas de 300; deja la sesión del admin de su empresa. */
@@ -45,9 +47,7 @@ class ReciboCajaTest extends TestCase
     /** Descomprime los flujos del PDF para poder buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
-
-        return collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        return $this->flujosDescomprimidos($pdf);
     }
 
     public function test_cada_pago_recibe_su_recibo_numerado_en_orden(): void

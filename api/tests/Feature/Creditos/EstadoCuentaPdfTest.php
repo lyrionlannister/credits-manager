@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\Concerns\CreatesCreditFixtures;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\TestCase;
 
 class EstadoCuentaPdfTest extends TestCase
@@ -18,6 +19,7 @@ class EstadoCuentaPdfTest extends TestCase
     use ActsAsAdmin;
     use AfirmaAuditoria;
     use CreatesCreditFixtures;
+    use LeeFlujosPdf;
     use RefreshDatabase;
 
     /** Un crédito con una cuota pagada, una pendiente y un pago; devuelve el crédito ya con la sesión del admin de su empresa. */
@@ -39,9 +41,7 @@ class EstadoCuentaPdfTest extends TestCase
     /** Descomprime los flujos del PDF para poder buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
-
-        return collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        return $this->flujosDescomprimidos($pdf);
     }
 
     public function test_sin_autenticar_no_descarga_el_pdf(): void

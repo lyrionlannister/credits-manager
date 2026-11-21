@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\Concerns\CreatesCreditFixtures;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\TestCase;
 
 class SimulacionCreditoPdfTest extends TestCase
@@ -15,6 +16,7 @@ class SimulacionCreditoPdfTest extends TestCase
     use ActsAsAdmin;
     use AfirmaAuditoria;
     use CreatesCreditFixtures;
+    use LeeFlujosPdf;
     use RefreshDatabase;
 
     private const URL = '/api/v1/creditos/previsualizar/pdf';
@@ -36,9 +38,7 @@ class SimulacionCreditoPdfTest extends TestCase
     /** Descomprime los flujos del PDF y quita el escape de `(`, `)` y `\` de sus cadenas literales para buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
-
-        $texto = collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        $texto = $this->flujosDescomprimidos($pdf);
 
         return strtr($texto, ['\\(' => '(', '\\)' => ')', '\\\\' => '\\']);
     }
