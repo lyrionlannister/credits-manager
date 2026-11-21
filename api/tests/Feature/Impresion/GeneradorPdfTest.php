@@ -15,11 +15,14 @@ use App\Impresion\Enums\TipoColumnaDocumento;
 use App\Impresion\Services\GeneradorPdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\Support\DocumentoPdfDePrueba;
 use Tests\TestCase;
 
 class GeneradorPdfTest extends TestCase
 {
+    use LeeFlujosPdf;
+
     private function empresa(array $atributos = []): Empresa
     {
         $empresa = new Empresa(array_merge([
@@ -43,9 +46,7 @@ class GeneradorPdfTest extends TestCase
     /** Descomprime los flujos del PDF para poder buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
-
-        return collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        return $this->flujosDescomprimidos($pdf);
     }
 
     private function paginasDe(string $pdf): int

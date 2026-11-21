@@ -9,6 +9,7 @@ use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\Concerns\CreatesAuditoriaFixtures;
 use Tests\Concerns\CreatesContabilidadFixtures;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\TestCase;
 
 class ComprobantePdfTest extends TestCase
@@ -17,6 +18,7 @@ class ComprobantePdfTest extends TestCase
     use AfirmaAuditoria;
     use CreatesAuditoriaFixtures;
     use CreatesContabilidadFixtures;
+    use LeeFlujosPdf;
     use RefreshDatabase;
 
     /**
@@ -54,9 +56,7 @@ class ComprobantePdfTest extends TestCase
     /** Descomprime los flujos del PDF para poder buscar el texto dibujado. */
     private function textoDe(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $flujos);
-
-        return collect($flujos[1])->map(fn (string $flujo) => @gzuncompress($flujo) ?: '')->implode("\n");
+        return $this->flujosDescomprimidos($pdf);
     }
 
     private function afirmarTexto(string $texto, array $esperados): void

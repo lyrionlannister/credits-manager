@@ -18,6 +18,7 @@ use Tests\Concerns\ActsAsAdmin;
 use Tests\Concerns\AfirmaAuditoria;
 use Tests\Concerns\CreatesAuditoriaFixtures;
 use Tests\Concerns\CreatesCreditFixtures;
+use Tests\Concerns\LeeFlujosPdf;
 use Tests\TestCase;
 
 class ReporteEmpleadorExportarTest extends TestCase
@@ -26,6 +27,7 @@ class ReporteEmpleadorExportarTest extends TestCase
     use AfirmaAuditoria;
     use CreatesAuditoriaFixtures;
     use CreatesCreditFixtures;
+    use LeeFlujosPdf;
     use RefreshDatabase;
 
     private const PDF = '/api/v1/cartera/reporte-empleador/pdf';
@@ -112,23 +114,6 @@ class ReporteEmpleadorExportarTest extends TestCase
         }
 
         return implode(' ', $partes);
-    }
-
-    /**
-     * Corta cada flujo por su `/Length` en vez de buscar `endstream`: los bytes comprimidos cambian con la fecha de
-     * generación y pueden terminar en `\r` o contener `\nendstream`, lo que dejaba la página sin texto según el día.
-     */
-    private function flujosDescomprimidos(string $pdf): string
-    {
-        preg_match_all('/\/Length\s+(\d+)[^>]*>>\s*stream\r?\n/', $pdf, $cabeceras, PREG_OFFSET_CAPTURE);
-
-        $flujos = [];
-        foreach ($cabeceras[0] as $indice => [$cabecera, $posicion]) {
-            $datos = substr($pdf, $posicion + strlen($cabecera), (int) $cabeceras[1][$indice][0]);
-            $flujos[] = @gzuncompress($datos) ?: '';
-        }
-
-        return implode("\n", $flujos);
     }
 
     /** Quita el escape PDF de paréntesis y backslash dentro de una cadena literal `(...)`. */
