@@ -8,6 +8,7 @@ import type { FC } from 'react';
 import { useState } from 'react';
 
 import { usePermission } from '../../auth/hooks/use-permission';
+import { useCalendarAutoResize } from '../../shared/hooks/use-calendar-auto-resize';
 import { useResource } from '../../shared/hooks/use-resource';
 import { useSendRequest } from '../../shared/hooks/use-send-request';
 import { Button } from '@ui/button/components/button';
@@ -37,6 +38,7 @@ export const TaxObligationsPage: FC = () => {
     const puedeCambiarEstado = usePermission('obligaciones_tributarias', 'cambiar_estado');
     const puedeEliminar = usePermission('obligaciones_tributarias', 'eliminar');
     const { sendRequest, isLoading: isDeleting } = useSendRequest();
+    const { calendarRef, containerRef } = useCalendarAutoResize();
 
     const [mes, setMes] = useState(mesActualEnCurso);
     const { data: respuesta, error, refetch } = useResource<{ data: ApiTaxObligation[] }>(`/obligaciones-tributarias?mes=${mes}`);
@@ -170,8 +172,9 @@ export const TaxObligationsPage: FC = () => {
                 </div>
             )}
 
-            <div className="custom-calendar overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+            <div ref={containerRef} className="custom-calendar overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <FullCalendar
+                    ref={calendarRef}
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                     initialView="dayGridMonth"
                     height={650}

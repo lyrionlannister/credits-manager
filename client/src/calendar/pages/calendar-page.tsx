@@ -7,6 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import type { FC } from 'react';
 import { useState } from 'react';
 
+import { useCalendarAutoResize } from '../../shared/hooks/use-calendar-auto-resize';
 import { useResource } from '../../shared/hooks/use-resource';
 import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
 import { PageSkeleton } from '@ui/skeleton/components/page-skeleton';
@@ -29,6 +30,7 @@ export const CalendarPage: FC = () => {
     const [mes, setMes] = useState(mesActualEnCurso);
     const [rango, setRango] = useState<CalendarRange>('mes');
     const [empleadorId, setEmpleadorId] = useState<number | null>(null);
+    const { calendarRef, containerRef } = useCalendarAutoResize();
 
     const parametros = new URLSearchParams({ mes });
     if (empleadorId) {
@@ -112,8 +114,9 @@ export const CalendarPage: FC = () => {
             {/* Altura fija (no depende de un ancestro con altura acotada, `AppLayout` ya no
                 provee eso a propósito) — con `expandRows` + `dayMaxEventRows` esto le alcanza
                 a un mes de 6 filas sin necesitar scroll de página completa en pantallas típicas. */}
-            <div className="custom-calendar overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+            <div ref={containerRef} className="custom-calendar overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <FullCalendar
+                    ref={calendarRef}
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                     initialView="dayGridMonth"
                     height={650}
