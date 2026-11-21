@@ -164,6 +164,8 @@ describe('NewImportPage', () => {
         expect(await screen.findByText('Ejemplo de estructura')).toBeTruthy();
         expect(screen.getByText('Gastos administrativos (%)')).toBeTruthy();
         expect(screen.getByText('0,20')).toBeTruthy();
+        expect(screen.getByText('Tasa efectiva anual (%)')).toBeTruthy();
+        expect(screen.getByText(/porcentaje mensual del capital/)).toBeTruthy();
     });
 
     it('al subir navega a la pantalla de la importación creada', async () => {

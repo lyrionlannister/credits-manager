@@ -154,11 +154,7 @@ export const NewImportForm: FC = () => {
                 <CsvExampleCard
                     icon={<FileText className="size-4" />}
                     title="Ejemplo de estructura"
-                    subtitle={
-                        tipo === 'creditos'
-                            ? 'La columna del CSV se escribe como gastos_administracion y conserva el porcentaje en la fila de ejemplo.'
-                            : 'Estructura esperada del archivo CSV para esta hoja.'
-                    }
+                    subtitle={IMPORT_EXAMPLE_BY_TYPE[tipo].note ?? 'Estructura esperada del archivo CSV para esta hoja.'}
                     columns={IMPORT_EXAMPLE_BY_TYPE[tipo].columns}
                     example={IMPORT_EXAMPLE_BY_TYPE[tipo].example}
                 />
