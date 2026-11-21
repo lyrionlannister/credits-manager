@@ -3,6 +3,7 @@
 namespace Tests\Feature\Cartera;
 
 use App\Creditos\Enums\EstadoCuota;
+use App\Creditos\Enums\TipoPago;
 use App\Empleadores\Models\Empleador;
 use App\Empresas\Models\Empresa;
 use App\Exportacion\Constants\ExportacionConstants;
@@ -214,6 +215,28 @@ class ReporteEmpleadorExportarTest extends TestCase
         foreach (['de descuento', 'Hospital del Norte SAS', 'Ana Gomez', 'Luis Perez', 'Feb 2026', 'Mar 2026', '300.00', 'Pagada', 'Vencida', 'Total por mes', '800.00'] as $esperado) {
             $this->assertTrue(str_contains($texto, $esperado), "No aparece «{$esperado}» en el PDF.");
         }
+    }
+
+    public function test_las_cuotas_del_mismo_mes_se_suman_y_el_mes_toma_el_estado_mas_grave(): void
+    {
+        $this->actingAsAdmin();
+        $empleador = $this->crearEmpleador();
+        $cliente = $this->crearCliente(['empleador_id' => $empleador->id]);
+
+        $quincenal = $this->crearCredito($cliente, ['tipo_pago' => TipoPago::Quincenal, 'valor_cuota' => 200]);
+        $this->crearCuota($quincenal, ['numero_cuota' => 1, 'fecha_vencimiento' => '2030-02-15', 'valor' => 200, 'estado' => EstadoCuota::Pagada, 'valor_pagado' => 200]);
+        $this->crearCuota($quincenal, ['numero_cuota' => 2, 'fecha_vencimiento' => '2030-02-28', 'valor' => 200]);
+
+        $mensual = $this->crearCredito($cliente, ['valor_cuota' => 500]);
+        $this->crearCuota($mensual, ['numero_cuota' => 1, 'fecha_vencimiento' => '2030-02-20', 'valor' => 500]);
+
+        $respuesta = $this->getJson('/api/v1/cartera/reporte-empleador?empleador_id='.$empleador->id)->assertOk();
+
+        $respuesta->assertJsonCount(1, 'filas')
+            ->assertJsonPath('filas.0.valor_cuota', '700.00')
+            ->assertJsonPath('filas.0.cuotas.2030-02.valor', '900.00')
+            ->assertJsonPath('filas.0.cuotas.2030-02.estado', 'pendiente');
+        $this->assertEquals(900, $respuesta->json('totales_por_mes.2030-02'));
     }
 
     public function test_un_empleador_sin_cuotas_genera_el_pdf_sin_totales(): void

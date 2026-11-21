@@ -5,6 +5,7 @@ namespace App\Cartera\Services;
 use App\Cartera\Constants\CarteraConstants;
 use App\Cartera\Exportaciones\FuenteCartera;
 use App\Core\Dinero\Dinero;
+use App\Creditos\Enums\EstadoCuota;
 use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Services\CuotaService;
@@ -176,6 +177,7 @@ class CarteraService
 
         $meses = [];
         $filas = [];
+        $creditosContados = [];
 
         if ($empleadorSeleccionado) {
             foreach ($this->cuotas->porEmpleador($empleadorSeleccionado) as $cuota) {
@@ -189,10 +191,21 @@ class CarteraService
                 $filas[$clienteId] ??= [
                     'cliente_id' => $clienteId,
                     'cliente_nombre' => $cuota->credito->cliente->tercero->nombre,
-                    'valor_cuota' => $cuota->credito->valor_cuota_total,
+                    'valor_cuota' => Dinero::cero(),
                     'cuotas' => [],
                 ];
-                $filas[$clienteId]['cuotas'][$periodo] = ['valor' => $cuota->valor_total_cuota, 'estado' => $cuota->estado];
+
+                if (! isset($creditosContados[$cuota->credito_id])) {
+                    $creditosContados[$cuota->credito_id] = true;
+                    $filas[$clienteId]['valor_cuota'] = $filas[$clienteId]['valor_cuota']->sumar($cuota->credito->valor_cuota_total);
+                }
+
+                // Quincenal (o varios créditos) deja varias cuotas en el mismo mes: la relación de descuento es mensual, así que se suman.
+                $previa = $filas[$clienteId]['cuotas'][$periodo] ?? null;
+                $filas[$clienteId]['cuotas'][$periodo] = [
+                    'valor' => $previa === null ? $cuota->valor_total_cuota : $previa['valor']->sumar($cuota->valor_total_cuota),
+                    'estado' => $previa === null ? $cuota->estado : $this->estadoMasGrave($previa['estado'], $cuota->estado),
+                ];
             }
 
             sort($meses);
@@ -212,5 +225,16 @@ class CarteraService
             'filas' => array_values($filas),
             'totales_por_mes' => $totalesPorMes,
         ];
+    }
+
+    private function estadoMasGrave(EstadoCuota $a, EstadoCuota $b): EstadoCuota
+    {
+        $gravedad = fn (EstadoCuota $estado) => match ($estado) {
+            EstadoCuota::Pagada => 0,
+            EstadoCuota::Pendiente => 1,
+            EstadoCuota::Vencida => 2,
+        };
+
+        return $gravedad($b) > $gravedad($a) ? $b : $a;
     }
 }
