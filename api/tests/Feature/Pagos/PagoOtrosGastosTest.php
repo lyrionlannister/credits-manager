@@ -139,6 +139,27 @@ class PagoOtrosGastosTest extends TestCase
         );
     }
 
+    public function test_la_liquidacion_con_fecha_pasada_cuenta_los_otros_gastos_hasta_esa_fecha_y_no_hasta_hoy(): void
+    {
+        $credito = $this->crearCredito($this->crearCliente(), [
+            'gastos_administracion_pct' => 1,
+            'valor_prestamo' => 900,
+            'fecha_desembolso' => now('America/Bogota')->subDays(50)->toDateString(),
+        ]);
+        foreach ([-20, 10, 40] as $posicion => $dias) {
+            $this->crearCuota($credito, [
+                'numero_cuota' => $posicion + 1,
+                'fecha_vencimiento' => now('America/Bogota')->addDays($dias)->toDateString(),
+                'valor' => 300, 'valor_capital' => 300, 'valor_interes' => 0, 'valor_otros_gastos' => 10, 'valor_pagado' => 0,
+            ]);
+        }
+
+        $liquidacion = app(PagoService::class)->calcularLiquidacion($credito->fresh(), now('America/Bogota')->subDays(10)->toDateString());
+
+        // A la fecha de pago: cuota 1 vencida, 10 completos; cuota 2 lleva 10 de 30 días, 3,33; cuota 3 no inicia. Hoy darían 16,67.
+        $this->assertSame(1000 + 333, $liquidacion['otros_gastos']->centavos());
+    }
+
     public function test_el_recaudo_con_otros_gastos_genera_un_comprobante_balanceado(): void
     {
         $this->configurarReglas();

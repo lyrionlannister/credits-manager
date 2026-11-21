@@ -80,6 +80,20 @@ class AlinearCuotasQuincenalesTest extends TestCase
         $this->assertSame(40.0, $credito->cuotas()->where('numero_cuota', 1)->firstOrFail()->valor_pagado->aFloat());
     }
 
+    public function test_sin_cuotas_tocadas_la_primera_respeta_los_dias_minimos_desde_el_desembolso(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $credito = $this->crearCredito($this->crearCliente(), ['tipo_pago' => TipoPago::Quincenal, 'fecha_desembolso' => '2030-01-10', 'plazo' => 2]);
+        $this->crearCuota($credito, ['numero_cuota' => 1, 'fecha_vencimiento' => '2030-01-31', 'valor' => 100]);
+        $this->crearCuota($credito, ['numero_cuota' => 2, 'fecha_vencimiento' => '2030-02-15', 'valor' => 100]);
+
+        $this->artisan("creditos:alinear-quincenas --empresa={$admin->empresa_id} --aplicar")
+            ->expectsOutputToContain('No hay cuotas quincenales por alinear')
+            ->assertSuccessful();
+
+        $this->assertSame(['2030-01-31', '2030-02-15'], $this->fechas($credito));
+    }
+
     public function test_es_idempotente(): void
     {
         $admin = $this->actingAsAdmin();

@@ -19,7 +19,7 @@ class OtrosGastosCalculator
 
     /**
      * Parte de un valor de periodo devengada tras $dias: días / días del periodo, topado en 1.
-     * Mismo conteo que la liquidación anticipada (tasa ÷ 30 o ÷ 15 según el tipo de pago).
+     * El valor de periodo ya es el de una cuota (medio mes en quincenal), así que ÷ 15 en quincenal equivale al ÷ 30 mensual de la liquidación.
      */
     public static function proporcionalPorDias(Dinero $valorPeriodo, int $dias, TipoPago $tipoPago): Dinero
     {
