@@ -4,7 +4,7 @@ import type { ImportType } from './import-types';
  * El ejemplo de clientes, creditos, plan_cuotas y pagos debe coincidir con la huella que usa el backend para
  * rechazar la fila de ejemplo (`DefinicionImportacion::huellaDeEjemplo()`) — si cambia uno, cambia el otro.
  */
-export const IMPORT_EXAMPLE_BY_TYPE: Record<ImportType, { columns: { key: string; label: string }[]; example: Record<string, string> }> = {
+export const IMPORT_EXAMPLE_BY_TYPE: Record<ImportType, { columns: { key: string; label: string }[]; example: Record<string, string>; note?: string }> = {
     clientes: {
         columns: [
             { key: 'cedula', label: 'Cédula' },
@@ -20,6 +20,7 @@ export const IMPORT_EXAMPLE_BY_TYPE: Record<ImportType, { columns: { key: string
             { key: 'fecha_desembolso', label: 'Fecha de desembolso' },
             { key: 'valor', label: 'Valor desembolsado (capital)' },
             { key: 'tasa', label: 'Tasa de interés mensual (%)' },
+            { key: 'tasa_efectiva_anual', label: 'Tasa efectiva anual (%)' },
             { key: 'plazo', label: 'Plazo (# cuotas)' },
             { key: 'periodicidad', label: 'Periodicidad (Mensual/Quincenal)' },
             { key: 'cuota', label: 'Cuota fija' },
@@ -32,12 +33,14 @@ export const IMPORT_EXAMPLE_BY_TYPE: Record<ImportType, { columns: { key: string
             fecha_desembolso: '01/10/2023',
             valor: '2000000',
             tasa: '2,5',
+            tasa_efectiva_anual: '',
             plazo: '4',
             periodicidad: 'mensual',
             cuota: '',
             gastos_administracion: '0,20',
             es_refinanciacion: 'No',
         },
+        note: 'Los gastos administrativos son un porcentaje mensual del capital: en quincenal se reparte entre las dos cuotas del mes. La tasa efectiva anual es opcional; si la das, manda sobre la mensual y puedes dejar la mensual vacía.',
     },
     plan_cuotas: {
         columns: [

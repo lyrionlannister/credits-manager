@@ -35,14 +35,16 @@ final class DefinicionImportacion
             TipoImportacion::Creditos => [
                 'hoja' => 'Creditos',
                 'orden' => 2,
-                'nota' => 'Requiere que los clientes ya existan en el sistema. Las refinanciaciones no se importan en esta carga.',
+                'nota' => 'Requiere que los clientes ya existan en el sistema. Las refinanciaciones no se importan en esta carga. Si das la tasa efectiva anual, manda sobre la mensual y puedes dejar la mensual vacía. Los gastos administrativos son un porcentaje mensual del capital: en quincenal se reparte entre las dos cuotas del mes.',
                 'permiso' => ['importaciones', 'importar_creditos'],
                 'columnas' => [
                     self::c('codigo', 'Código de crédito', true, 'texto'),
                     self::c('cedula', 'Cédula cliente', true, 'texto'),
                     self::c('fecha_desembolso', 'Fecha de desembolso', true, 'fecha'),
                     self::c('valor', 'Valor desembolsado (capital)', true, 'monto'),
+                    // Obligatoria solo como encabezado (plantillas existentes); la celda puede ir vacía si viene la EA.
                     self::c('tasa', 'Tasa de interés mensual (%)', true, 'decimal'),
+                    self::c('tasa_efectiva_anual', 'Tasa efectiva anual (%)', false, 'decimal'),
                     self::c('plazo', 'Plazo (# cuotas)', true, 'entero'),
                     self::c('periodicidad', 'Periodicidad (Mensual/Quincenal)', true, 'texto'),
                     self::c('cuota', 'Cuota fija (si ya la calcularon)', false, 'monto'),
