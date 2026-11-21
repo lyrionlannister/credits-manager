@@ -5,8 +5,8 @@ import { StackedBarChart } from '@ui/charts/components/stacked-bar-chart';
 import type { CreditInstallmentsChartCardProps } from '../props/credit-installments-chart-card-props';
 
 export const CreditInstallmentsChartCard: FC<CreditInstallmentsChartCardProps> = ({ cuotas }) => (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 print:border-0 print:p-0 dark:border-gray-800 dark:bg-white/3 xl:col-span-2">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Composición de las cuotas</h2>
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 print:border-0 print:p-0 dark:border-gray-800 dark:bg-white/3">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Composición de las cuotas</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Interés y capital de cada cuota, según el plan original.</p>
 
         <StackedBarChart

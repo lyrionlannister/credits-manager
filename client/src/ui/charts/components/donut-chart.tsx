@@ -55,7 +55,8 @@ export const DonutChart: FC<DonutChartProps> = ({
     };
 
     return (
-        <div id="chartDarkStyle">
+        // ApexCharts redibuja con retardo tras un resize: sin recorte, el SVG viejo desborda la card un instante.
+        <div id="chartDarkStyle" className="min-w-0 overflow-hidden">
             <Chart type="donut" height={height} series={series} options={options} />
             <div className="-mt-2 text-center">
                 <p className="text-theme-xs text-gray-500 dark:text-gray-400">{totalLabel}</p>

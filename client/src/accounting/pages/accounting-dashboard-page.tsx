@@ -16,8 +16,10 @@ import {
 
 import { useResource } from '../../shared/hooks/use-resource';
 import { usePermission } from '../../auth/hooks/use-permission';
+import { centsFromMoneyText } from '../../shared/utils/cents-from-money-text';
 import { formatDateEs } from '../../shared/utils/format-date-es';
 import { formatDateTimeEs } from '../../shared/utils/format-datetime-es';
+import { moneyTextFromCents } from '../../shared/utils/money-text-from-cents';
 import { formatMoney } from '../../shared/utils/format-money';
 import { StatCard } from '../../layout/components/stat-card';
 import type { StatCardCambio } from '../../layout/types/stat-card-cambio';
@@ -98,23 +100,6 @@ type DonutBreakdownRow = { key: string | number; nombre: string; valor: string }
 
 const MAX_FILAS_DONUT = 5;
 
-/** Convierte un string decimal de 2 cifras (ej. "1234.56", el formato que siempre emite `Dinero`) a centavos, sin pasar por float. */
-function centavosDeTexto(valor: string): bigint {
-    const negativo = valor.startsWith('-');
-    const [entero, decimal = '00'] = valor.replace('-', '').split('.');
-    const centavos = BigInt(entero) * 100n + BigInt(decimal.padEnd(2, '0').slice(0, 2));
-
-    return negativo ? -centavos : centavos;
-}
-
-/** Inverso de `centavosDeTexto`. */
-function textoDeCentavos(centavos: bigint): string {
-    const negativo = centavos < 0n;
-    const absolutos = negativo ? -centavos : centavos;
-
-    return `${negativo ? '-' : ''}${absolutos / 100n}.${(absolutos % 100n).toString().padStart(2, '0')}`;
-}
-
 /**
  * Descarta las filas en cero y, si quedan más de `MAX_FILAS_DONUT`, conserva las de mayor magnitud y agrupa
  * el resto en una fila "Otros" — la suma de "Otros" se hace en centavos enteros, nunca con floats.
@@ -126,24 +111,24 @@ function construirFilasDonut(rows: (ApiDashboardAccountRow | ApiDashboardCostCen
             nombre: fila.nombre,
             valor: fila.valor,
         }))
-        .filter((fila) => centavosDeTexto(fila.valor) !== 0n);
+        .filter((fila) => centsFromMoneyText(fila.valor) !== 0n);
 
     if (conValor.length <= MAX_FILAS_DONUT) {
         return conValor;
     }
 
     const ordenadas = [...conValor].sort((a, b) => {
-        const absolutaA = centavosDeTexto(a.valor) < 0n ? -centavosDeTexto(a.valor) : centavosDeTexto(a.valor);
-        const absolutaB = centavosDeTexto(b.valor) < 0n ? -centavosDeTexto(b.valor) : centavosDeTexto(b.valor);
+        const absolutaA = centsFromMoneyText(a.valor) < 0n ? -centsFromMoneyText(a.valor) : centsFromMoneyText(a.valor);
+        const absolutaB = centsFromMoneyText(b.valor) < 0n ? -centsFromMoneyText(b.valor) : centsFromMoneyText(b.valor);
 
         return absolutaA > absolutaB ? -1 : absolutaA < absolutaB ? 1 : 0;
     });
 
     const principales = ordenadas.slice(0, MAX_FILAS_DONUT);
     const resto = ordenadas.slice(MAX_FILAS_DONUT);
-    const totalResto = resto.reduce((suma, fila) => suma + centavosDeTexto(fila.valor), 0n);
+    const totalResto = resto.reduce((suma, fila) => suma + centsFromMoneyText(fila.valor), 0n);
 
-    return [...principales, { key: 'otros', nombre: 'Otros', valor: textoDeCentavos(totalResto) }];
+    return [...principales, { key: 'otros', nombre: 'Otros', valor: moneyTextFromCents(totalResto) }];
 }
 
 /**

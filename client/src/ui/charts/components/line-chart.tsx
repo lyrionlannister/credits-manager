@@ -33,5 +33,10 @@ export const LineChart: FC<LineChartProps> = ({ categories, series, height = 310
         tooltip: { y: { formatter: formatear } },
     };
 
-    return <Chart type="area" height={height} series={series.map(({ name, data }) => ({ name, data }))} options={options} />;
+    // ApexCharts redibuja con retardo tras un resize: sin recorte, el SVG viejo desborda la card un instante.
+    return (
+        <div className="min-w-0 overflow-hidden">
+            <Chart type="area" height={height} series={series.map(({ name, data }) => ({ name, data }))} options={options} />
+        </div>
+    );
 };

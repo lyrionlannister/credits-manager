@@ -15,9 +15,10 @@ export function DataTable<T>({
     loadingMessage = 'Cargando…',
     emptyMessage = 'No hay resultados.',
     maxHeightClassName,
+    className,
 }: DataTableProps<T>): ReactElement {
     return (
-        <div>
+        <div className={className}>
             <div className={`custom-scrollbar overflow-x-auto ${maxHeightClassName ? `${maxHeightClassName} overflow-y-auto` : ''}`}>
                 <table className="w-full text-left text-sm">
                     <thead>

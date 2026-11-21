@@ -2,7 +2,7 @@ import type { ApiClient } from '../../clients/types/api-client';
 import type { ApiCreditPreview } from '../types/api-credit-preview';
 import type { PaymentType } from '../types/payment-type';
 
-export type CreditPreviewModalProps = {
+export type CreditSimulationViewProps = {
     preview: ApiCreditPreview;
     cliente: ApiClient;
     creditoOrigenId: number | null;
@@ -17,5 +17,5 @@ export type CreditPreviewModalProps = {
     modo?: 'crear' | 'editar';
     isCreating: boolean;
     onConfirm: () => void;
-    onClose: () => void;
+    onBack: () => void;
 };
