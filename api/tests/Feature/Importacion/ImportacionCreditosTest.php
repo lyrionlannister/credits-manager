@@ -6,9 +6,13 @@ use App\Contabilidad\Enums\EstadoPeriodo;
 use App\Contabilidad\Enums\EventoContable;
 use App\Contabilidad\Models\PeriodoContable;
 use App\Contabilidad\Models\PlanCuenta;
+use App\Core\Dinero\Dinero;
 use App\Creditos\Enums\EstadoCredito;
+use App\Creditos\Enums\TipoCredito;
+use App\Creditos\Enums\TipoPago;
 use App\Creditos\Models\Credito;
 use App\Creditos\Models\Cuota;
+use App\Creditos\Services\AmortizacionCalculator;
 use App\Importacion\Enums\EstadoImportacion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +46,24 @@ class ImportacionCreditosTest extends TestCase
     private function creditoCSV(string $codigo = 'CR-1', string $cedula = '1001', string $gastos = '0'): string
     {
         return self::ENCABEZADO_CREDITOS."{$codigo};{$cedula};01/10/2023;2000000;2,5;4;mensual;;{$gastos};No;;;;\n";
+    }
+
+    private function creditoConEaCSV(string $codigo, string $tasaMensual, string $tasaEfectivaAnual): string
+    {
+        return rtrim(self::ENCABEZADO_CREDITOS, "\n").";Tasa efectiva anual (%)\n".$this->filaConEa($codigo, $tasaMensual, $tasaEfectivaAnual);
+    }
+
+    private function filaConEa(string $codigo, string $tasaMensual, string $tasaEfectivaAnual): string
+    {
+        return "{$codigo};1001;01/10/2023;2000000;{$tasaMensual};4;mensual;;0;No;;;;;{$tasaEfectivaAnual}\n";
+    }
+
+    /** @return list<array{int, string, int, int, int}> */
+    private function planDe(int $creditoId): array
+    {
+        return Cuota::query()->where('credito_id', $creditoId)->orderBy('numero_cuota')->get()
+            ->map(fn (Cuota $cuota) => [$cuota->numero_cuota, $cuota->fecha_vencimiento->format('Y-m-d'), $cuota->valor_capital->centavos(), $cuota->valor_interes->centavos(), $cuota->valor->centavos()])
+            ->all();
     }
 
     private function clienteCon(string $cedula = '1001'): void
@@ -91,6 +113,100 @@ class ImportacionCreditosTest extends TestCase
         $this->assertSame('0.200', $credito->gastos_administracion_pct);
         $this->assertSame(4, Cuota::query()->where('credito_id', $credito->id)->count());
         $this->assertTrue(Cuota::query()->where('credito_id', $credito->id)->get()->every(fn (Cuota $cuota) => $cuota->valor_otros_gastos->centavos() === 400000));
+    }
+
+    public function test_un_archivo_sin_la_columna_de_tasa_efectiva_anual_importa_con_la_mensual_y_sin_ea(): void
+    {
+        $this->actingAsAdmin();
+        $this->clienteCon();
+
+        $id = $this->importarCompleto('creditos', $this->creditoCSV());
+
+        $this->assertSame(1, $this->importacion($id)->filas_aceptadas);
+        $this->assertDatabaseHas('creditos', ['codigo' => 'CR-1', 'tasa_interes' => 2.5, 'tasa_efectiva_anual' => null]);
+    }
+
+    public function test_con_tasa_efectiva_anual_guarda_la_ea_la_mensual_derivada_y_el_mismo_plan_que_la_api(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $this->clienteCon();
+
+        $id = $this->importarCompleto('creditos', $this->creditoConEaCSV('CR-EA', '', '28,59'));
+
+        $this->assertSame(1, $this->importacion($id)->filas_aceptadas);
+        $importado = Credito::query()->where('codigo', 'CR-EA')->firstOrFail();
+        $mensual = AmortizacionCalculator::tasaMensualDesdeEfectivaAnual(28.59);
+        $this->assertSame($admin->empresa_id, $importado->empresa_id);
+        $this->assertSame('28.5900', $importado->tasa_efectiva_anual);
+        $this->assertSame(number_format(round($mensual, 6), 6, '.', ''), $importado->tasa_interes);
+
+        $creadoPorApi = $this->postJson('/api/v1/creditos', [
+            'cliente_id' => $importado->cliente_id,
+            'tipo_credito' => TipoCredito::Nuevo->value,
+            'valor_prestamo' => 2000000,
+            'tasa_efectiva_anual' => 28.59,
+            'plazo' => 4,
+            'tipo_pago' => TipoPago::Mensual->value,
+            'fecha_desembolso' => '2023-10-01',
+        ])->assertCreated()->json('credito.id');
+
+        $this->assertSame($this->planDe($creadoPorApi), $this->planDe($importado->id));
+        $this->assertSame(Credito::query()->findOrFail($creadoPorApi)->tasa_interes, $importado->tasa_interes);
+    }
+
+    public function test_una_tasa_efectiva_anual_en_cero_o_fuera_de_rango_rechaza_la_fila(): void
+    {
+        $this->actingAsAdmin();
+        $this->clienteCon();
+
+        $id = $this->importarCompleto('creditos', $this->creditoConEaCSV('CR-0', '', '0')
+            .$this->filaConEa('CR-MAX', '', '1000'));
+
+        $this->assertSame(0, $this->importacion($id)->filas_aceptadas);
+        $rechazos = array_filter($this->erroresDe($id), fn (array $error) => $error['severidad'] === 'error');
+        $this->assertCount(2, $rechazos);
+        $this->assertSame(['tasa_efectiva_anual'], array_values(array_unique(array_column($rechazos, 'columna'))));
+        $this->assertDatabaseCount('creditos', 0);
+    }
+
+    public function test_si_la_mensual_no_corresponde_a_la_ea_se_usa_la_ea_y_avisa(): void
+    {
+        $this->actingAsAdmin();
+        $this->clienteCon();
+
+        $id = $this->importarCompleto('creditos', $this->creditoConEaCSV('CR-INC', '2,5', '28,59')
+            .$this->filaConEa('CR-OK', '2,12', '28,59'));
+
+        $this->assertSame(2, $this->importacion($id)->filas_aceptadas);
+        $avisosDeTasa = array_values(array_filter($this->erroresDe($id), fn (array $error) => $error['severidad'] === 'aviso' && $error['columna'] === 'tasa'));
+        $this->assertCount(1, $avisosDeTasa);
+        $this->assertSame(2, $avisosDeTasa[0]['fila']);
+        $this->assertStringContainsString('se usa la efectiva anual', $avisosDeTasa[0]['motivo']);
+
+        $mensual = number_format(round(AmortizacionCalculator::tasaMensualDesdeEfectivaAnual(28.59), 6), 6, '.', '');
+        foreach (['CR-INC', 'CR-OK'] as $codigo) {
+            $credito = Credito::query()->where('codigo', $codigo)->firstOrFail();
+            $this->assertSame('28.5900', $credito->tasa_efectiva_anual);
+            $this->assertSame($mensual, $credito->tasa_interes);
+        }
+    }
+
+    public function test_el_aviso_de_cuota_solo_habla_de_redondeo_si_la_diferencia_es_de_centavos(): void
+    {
+        $this->actingAsAdmin();
+        $this->clienteCon();
+        $calculada = AmortizacionCalculator::calcular(Dinero::desdePesos(2000000), 2.5, 4, TipoPago::Mensual, '2023-10-01')['valor_cuota'];
+        $redondeada = str_replace('.', ',', $calculada->sumar(Dinero::desdeCentavos(50))->aDecimalString());
+        $distinta = str_replace('.', ',', $calculada->sumar(Dinero::desdePesos(5000))->aDecimalString());
+
+        $id = $this->importarCompleto('creditos', self::ENCABEZADO_CREDITOS
+            ."CR-R;1001;01/10/2023;2000000;2,5;4;mensual;{$redondeada};0;No;;;;\n"
+            ."CR-D;1001;01/10/2023;2000000;2,5;4;mensual;{$distinta};0;No;;;;\n");
+
+        $avisos = array_column(array_filter($this->erroresDe($id), fn (array $error) => $error['columna'] === 'cuota'), 'motivo', 'fila');
+        $this->assertStringContainsString('(diferencia de redondeo)', $avisos[2]);
+        $this->assertStringContainsString('(diferencia de 5000.00)', $avisos[3]);
+        $this->assertStringNotContainsString('redondeo', $avisos[3]);
     }
 
     public function test_un_credito_de_un_cliente_de_otra_empresa_no_se_importa(): void

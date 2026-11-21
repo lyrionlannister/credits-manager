@@ -37,4 +37,12 @@ class ImportacionConstants
     public const MOTIVO_ERROR_INESPERADO = 'No se pudo procesar el archivo por un error inesperado.';
 
     public const MOTIVO_FILA_INESPERADA = 'No se pudo procesar la fila por un error inesperado.';
+
+    /** Hasta un peso de diferencia la cuota del archivo se considera redondeada (p. ej. a pesos enteros); más allá es otra cuota. */
+    public const UMBRAL_REDONDEO_CUOTA_CENTAVOS = 100;
+
+    /** Puntos porcentuales: una mensual escrita con 2 decimales a partir de la EA se acepta como la misma tasa. */
+    public const TOLERANCIA_TASA_MENSUAL = 0.005;
+
+    public const TASA_EFECTIVA_ANUAL_MAXIMA = 999;
 }

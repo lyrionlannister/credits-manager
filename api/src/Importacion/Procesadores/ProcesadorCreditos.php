@@ -10,6 +10,7 @@ use App\Creditos\Repositories\CreditoRepository;
 use App\Creditos\Repositories\CuotaRepository;
 use App\Creditos\Services\AmortizacionCalculator;
 use App\Creditos\Services\OtrosGastosCalculator;
+use App\Importacion\Constants\ImportacionConstants;
 use App\Importacion\Data\ContextoEjecucion;
 use App\Importacion\Data\FilaRechazada;
 use App\Importacion\Lectura\ConvertidorValor;
@@ -55,8 +56,18 @@ final class ProcesadorCreditos implements ProcesadorFila
             ?? throw new FilaRechazada('La fecha de desembolso es obligatoria.', 'fecha_desembolso');
         $valor = ConvertidorValor::monto($valores['valor'], 'valor')
             ?? throw new FilaRechazada('El valor desembolsado es obligatorio.', 'valor');
-        $tasa = ConvertidorValor::decimal($valores['tasa'], 'tasa')
-            ?? throw new FilaRechazada('La tasa de interés es obligatoria.', 'tasa');
+        $tasaMensualArchivo = ConvertidorValor::decimal($valores['tasa'], 'tasa');
+        $tasaEfectivaAnual = ConvertidorValor::decimal($valores['tasa_efectiva_anual'] ?? '', 'tasa_efectiva_anual');
+        if ($tasaMensualArchivo === null && $tasaEfectivaAnual === null) {
+            throw new FilaRechazada('La tasa de interés es obligatoria: indica la mensual o la efectiva anual.', 'tasa');
+        }
+        if ($tasaEfectivaAnual !== null && ((float) $tasaEfectivaAnual <= 0 || (float) $tasaEfectivaAnual > ImportacionConstants::TASA_EFECTIVA_ANUAL_MAXIMA)) {
+            throw new FilaRechazada('La tasa efectiva anual debe ser mayor que cero y no superar '.ImportacionConstants::TASA_EFECTIVA_ANUAL_MAXIMA.' %.', 'tasa_efectiva_anual');
+        }
+        // Igual que CreditoService: con EA el plan usa la mensual derivada sin redondear y se guarda redondeada a 6.
+        $tasa = $tasaEfectivaAnual !== null
+            ? AmortizacionCalculator::tasaMensualDesdeEfectivaAnual((float) $tasaEfectivaAnual)
+            : (float) $tasaMensualArchivo;
         $plazo = ConvertidorValor::entero($valores['plazo'], 'plazo')
             ?? throw new FilaRechazada('El plazo es obligatorio.', 'plazo');
         $cuotaArchivo = ConvertidorValor::monto($valores['cuota'], 'cuota');
@@ -72,7 +83,7 @@ final class ProcesadorCreditos implements ProcesadorFila
             throw new FilaRechazada('El valor desembolsado debe ser mayor que cero.', 'valor');
         }
 
-        if ((float) $tasa <= 0 || $plazo < 1) {
+        if ($tasa <= 0 || $plazo < 1) {
             throw new FilaRechazada('La tasa y el plazo deben ser mayores que cero.', 'plazo');
         }
 
@@ -95,11 +106,20 @@ final class ProcesadorCreditos implements ProcesadorFila
         $clienteId = $ctx->clientesPorCedula[$cedula]
             ?? throw new FilaRechazada("No existe un cliente con cédula {$cedula}. Importa primero la hoja Clientes.", 'cedula');
 
-        $calculo = AmortizacionCalculator::calcular($valor, (float) $tasa, $plazo, $tipoPago, $fecha);
+        $calculo = AmortizacionCalculator::calcular($valor, $tasa, $plazo, $tipoPago, $fecha);
 
         $avisos = [];
+        if ($tasaEfectivaAnual !== null && $tasaMensualArchivo !== null && abs((float) $tasaMensualArchivo - $tasa) > ImportacionConstants::TOLERANCIA_TASA_MENSUAL) {
+            [$mensualArchivo, $efectivaAnual] = str_replace('.', ',', [$tasaMensualArchivo, $tasaEfectivaAnual]);
+            $mensualDerivada = number_format($tasa, 4, ',', '');
+            $avisos[] = ['severidad' => 'aviso', 'columna' => 'tasa', 'motivo' => "La tasa mensual del archivo ({$mensualArchivo} %) no corresponde a la efectiva anual ({$efectivaAnual} %), que equivale a {$mensualDerivada} % mensual: se usa la efectiva anual."];
+        }
         if ($cuotaArchivo !== null && ! $cuotaArchivo->igualA($calculo['valor_cuota'])) {
-            $avisos[] = ['severidad' => 'aviso', 'columna' => 'cuota', 'motivo' => "Cuota del archivo {$cuotaArchivo->aDecimalString()} y calculada {$calculo['valor_cuota']->aDecimalString()}: se usa la calculada (diferencia de redondeo)."];
+            $diferencia = $cuotaArchivo->restar($calculo['valor_cuota'])->absoluto();
+            $detalle = $diferencia->centavos() <= ImportacionConstants::UMBRAL_REDONDEO_CUOTA_CENTAVOS
+                ? 'diferencia de redondeo'
+                : "diferencia de {$diferencia->aDecimalString()}";
+            $avisos[] = ['severidad' => 'aviso', 'columna' => 'cuota', 'motivo' => "Cuota del archivo {$cuotaArchivo->aDecimalString()} y calculada {$calculo['valor_cuota']->aDecimalString()}: se usa la calculada ({$detalle})."];
         }
         if ($valores['estado'] !== '') {
             $avisos[] = ['severidad' => 'aviso', 'columna' => 'estado', 'motivo' => 'El estado se calcula con los pagos: el valor del archivo no se guarda.'];
@@ -111,7 +131,8 @@ final class ProcesadorCreditos implements ProcesadorFila
                 'codigo' => $codigo,
                 'tipo_credito' => TipoCredito::Nuevo,
                 'valor_prestamo' => $valor,
-                'tasa_interes' => $tasa,
+                'tasa_interes' => round($tasa, 6),
+                'tasa_efectiva_anual' => $tasaEfectivaAnual,
                 'gastos_administracion_pct' => $porcentajeGastos,
                 'plazo' => $plazo,
                 'tipo_pago' => $tipoPago,
