@@ -165,7 +165,7 @@ class ImportacionCreditosTest extends TestCase
         $this->assertSame(0, $this->importacion($id)->filas_aceptadas);
         $rechazos = array_filter($this->erroresDe($id), fn (array $error) => $error['severidad'] === 'error');
         $this->assertCount(2, $rechazos);
-        $this->assertSame(['tasa_efectiva_anual'], array_values(array_unique(array_column($rechazos, 'columna'))));
+        $this->assertSame(['Tasa efectiva anual (%)'], array_values(array_unique(array_column($rechazos, 'columna'))));
         $this->assertDatabaseCount('creditos', 0);
     }
 
@@ -178,7 +178,7 @@ class ImportacionCreditosTest extends TestCase
             .$this->filaConEa('CR-OK', '2,12', '28,59'));
 
         $this->assertSame(2, $this->importacion($id)->filas_aceptadas);
-        $avisosDeTasa = array_values(array_filter($this->erroresDe($id), fn (array $error) => $error['severidad'] === 'aviso' && $error['columna'] === 'tasa'));
+        $avisosDeTasa = array_values(array_filter($this->erroresDe($id), fn (array $error) => $error['severidad'] === 'aviso' && $error['columna'] === 'Tasa de interés mensual (%)'));
         $this->assertCount(1, $avisosDeTasa);
         $this->assertSame(2, $avisosDeTasa[0]['fila']);
         $this->assertStringContainsString('se usa la efectiva anual', $avisosDeTasa[0]['motivo']);
@@ -203,7 +203,7 @@ class ImportacionCreditosTest extends TestCase
             ."CR-R;1001;01/10/2023;2000000;2,5;4;mensual;{$redondeada};0;No;;;;\n"
             ."CR-D;1001;01/10/2023;2000000;2,5;4;mensual;{$distinta};0;No;;;;\n");
 
-        $avisos = array_column(array_filter($this->erroresDe($id), fn (array $error) => $error['columna'] === 'cuota'), 'motivo', 'fila');
+        $avisos = array_column(array_filter($this->erroresDe($id), fn (array $error) => $error['columna'] === 'Cuota fija (si ya la calcularon)'), 'motivo', 'fila');
         $this->assertStringContainsString('(diferencia de redondeo)', $avisos[2]);
         $this->assertStringContainsString('(diferencia de 5000.00)', $avisos[3]);
         $this->assertStringNotContainsString('redondeo', $avisos[3]);

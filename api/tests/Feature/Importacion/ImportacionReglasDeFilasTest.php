@@ -112,7 +112,7 @@ class ImportacionReglasDeFilasTest extends TestCase
         $this->assertSame(1, $this->importacion($id)->filas_aceptadas);
         $aviso = collect($this->erroresDe($id))->firstWhere('severidad', 'aviso');
         $this->assertNotNull($aviso);
-        $this->assertStringContainsString('diferencia de redondeo', $aviso['motivo']);
+        $this->assertStringContainsString('se usa la calculada (diferencia de 468363.24)', $aviso['motivo']);
         $this->assertSame(4, Cuota::query()->whereHas('credito', fn ($q) => $q->where('codigo', 'CR-5'))->count());
     }
 
