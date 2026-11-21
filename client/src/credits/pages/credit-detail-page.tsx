@@ -10,17 +10,20 @@ import { Button } from '@ui/button/components/button';
 import { PageBreadcrumb } from '@ui/breadcrumb/components/page-breadcrumb';
 import { ConfirmModal } from '@ui/modal/components/confirm-modal';
 import { PageSkeleton } from '@ui/skeleton/components/page-skeleton';
+import { centsFromMoneyText } from '../../shared/utils/cents-from-money-text';
+import { formatMoney } from '../../shared/utils/format-money';
 import { CreditCapitalRecoveryCard } from '../components/credit-capital-recovery-card';
-import { CreditInfoGrid } from '../components/credit-info-grid';
+import { CreditConditionsCard } from '../components/credit-conditions-card';
+import { CreditDetailHeader } from '../components/credit-detail-header';
 import { CreditInstallmentsChartCard } from '../components/credit-installments-chart-card';
 import { CreditInstallmentsTable } from '../components/credit-installments-table';
-import { CreditSummaryCards } from '../components/credit-summary-cards';
+import { CreditMetricTile } from '../components/credit-metric-tile';
 import { RefinancingNotice } from '../components/refinancing-notice';
 import { CREDIT_TRANSITION_ACTION_CONFIG } from '../constants/credit-transition-action-config';
 import { puedeCancelarCredito } from '../utils/can-cancel-credit';
 import type { ApiCreditDetail } from '../types/api-credit-detail';
 import type { CreditTransitionAction } from '../types/credit-transition-action';
-import { CalendarClock, CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal } from 'lucide-react';
+import { Ban, Banknote, CalendarClock, CheckCircle2, CircleDollarSign, FileText, HandCoins, Receipt, SlidersHorizontal, Trash2, Wallet } from 'lucide-react';
 
 export const CreditDetailPage: FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -91,82 +94,112 @@ export const CreditDetailPage: FC = () => {
     }
 
     const { credito, saldo, cartera, mora, refinanciacion, pagos, resumen_cuotas: resumenCuotas } = detalle;
-    const valorPrestamoNumerico = parseFloat(credito.valor_prestamo);
+    const prestadoCentavos = centsFromMoneyText(credito.valor_prestamo);
     const porcentajeCapitalRecuperado =
-        valorPrestamoNumerico > 0 ? (Number(resumenCuotas.saldo_capital_pagado) / valorPrestamoNumerico) * 100 : 0;
+        prestadoCentavos > 0n ? Number((centsFromMoneyText(resumenCuotas.saldo_capital_pagado) * 10000n) / prestadoCentavos) / 100 : 0;
+    const enMora = mora.cuotas_vencidas > 0;
 
     return (
-        <div className="flex min-h-full flex-col pb-6">
+        <div className="flex min-h-full flex-col gap-4 pb-6 md:gap-6">
             <PageBreadcrumb pageTitle={`Crédito de ${credito.cliente?.tercero.nombre ?? '—'}`} />
 
-            {refinanciacion && <RefinancingNotice vinculo={refinanciacion} valorPrestamo={credito.valor_prestamo} className="mb-6" />}
+            <CreditDetailHeader credito={credito} cartera={cartera}>
+                {(credito.estado === 'solicitado' || credito.estado === 'aprobado') && canEditar && (
+                    <Button iconOnly startIcon={<SlidersHorizontal className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/editar`)}>
+                        Modificar condiciones
+                    </Button>
+                )}
+                {credito.estado === 'desembolsado' && canEditar && (
+                    <Button iconOnly startIcon={<CalendarClock className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/reprogramar`)}>
+                        Reprogramar
+                    </Button>
+                )}
+                {canViewPayments && (
+                    <Button iconOnly startIcon={<Receipt className="size-4" />} variant="outline" onClick={() => navigate(`/pagos/creditos/${credito.id}`)}>
+                        Ver pagos
+                    </Button>
+                )}
+                <Button iconOnly startIcon={<FileText className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/estado-cuenta`)}>
+                    Estado de cuenta
+                </Button>
+                {canCancelar && puedeCancelarCredito(credito, pagos.length > 0) && (
+                    <Button iconOnly startIcon={<Ban className="size-4" />} variant="outline" onClick={() => setAccionPendiente('cancelar')}>
+                        Cancelar crédito
+                    </Button>
+                )}
+                {canEliminar && (
+                    <Button iconOnly startIcon={<Trash2 className="size-4" />} variant="outline" onClick={() => setShowDeleteConfirm(true)}>
+                        Eliminar crédito
+                    </Button>
+                )}
+                {credito.estado === 'desembolsado' && canRegisterPayment && (
+                    <Button variant="outline" startIcon={<CircleDollarSign className="size-4" />} onClick={() => navigate(`/pagos/creditos/${credito.id}/liquidar`)}>
+                        Liquidar
+                    </Button>
+                )}
+                {credito.estado === 'solicitado' && canAprobar && (
+                    <Button className="flex-1 lg:flex-none" startIcon={<CheckCircle2 className="size-4" />} onClick={() => setAccionPendiente('aprobar')}>
+                        Aprobar
+                    </Button>
+                )}
+                {credito.estado === 'aprobado' && canDesembolsar && (
+                    <Button className="flex-1 lg:flex-none" startIcon={<Banknote className="size-4" />} onClick={() => setAccionPendiente('desembolsar')}>
+                        Desembolsar
+                    </Button>
+                )}
+                {credito.estado === 'desembolsado' && canRegisterPayment && (
+                    <Button className="flex-1 lg:flex-none" startIcon={<HandCoins className="size-4" />} onClick={() => navigate(`/pagos/creditos/${credito.id}/nuevo`)}>
+                        Pagar cuota
+                    </Button>
+                )}
+            </CreditDetailHeader>
 
-            <CreditSummaryCards valorPrestamo={credito.valor_prestamo} valorTotal={credito.valor_total_con_otros} saldo={saldo} cartera={cartera} mora={mora} />
+            {accionError && <Alert variant="danger" title="Error" message={accionError} onDismiss={() => setAccionError(null)} />}
+            {deleteError && <Alert variant="danger" title="Error" message={deleteError} onDismiss={() => setDeleteError(null)} />}
 
-            <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <CreditInstallmentsChartCard cuotas={credito.cuotas ?? []} />
-                <CreditCapitalRecoveryCard porcentaje={porcentajeCapitalRecuperado} resumenCuotas={resumenCuotas} />
+            {refinanciacion && <RefinancingNotice vinculo={refinanciacion} valorPrestamo={credito.valor_prestamo} />}
+
+            <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
+                <CreditMetricTile
+                    label={cartera === 'Refinanciado' ? 'Saldo al refinanciar' : 'Saldo pendiente'}
+                    value={formatMoney(saldo)}
+                    icon={Wallet}
+                    tone={enMora ? 'error' : 'brand'}
+                    detail={
+                        enMora
+                            ? `${formatMoney(mora.monto_vencido)} vencido · ${mora.cuotas_vencidas} cuota${mora.cuotas_vencidas === 1 ? '' : 's'} · ${mora.dias} días`
+                            : undefined
+                    }
+                />
+                <CreditMetricTile label={`Cuota ${credito.tipo_pago}`} value={formatMoney(credito.valor_cuota_total)} icon={CalendarClock} />
+                <CreditMetricTile label="Valor prestado" value={formatMoney(credito.valor_prestamo)} icon={Banknote} />
+                <CreditMetricTile label="Total a pagar" value={formatMoney(credito.valor_total_con_otros)} icon={Receipt} />
             </div>
 
-            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3">
-                <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Datos del crédito</h2>
-                <CreditInfoGrid credito={credito} />
+            <CreditInstallmentsChartCard cuotas={credito.cuotas ?? []} />
 
-                {accionError && (
-                    <div className="mt-6">
-                        <Alert variant="danger" title="Error" message={accionError} onDismiss={() => setAccionError(null)} />
+            <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
+                {/* Desde `xl` la tarjeta va en absoluto: el alto de la fila lo pone la columna lateral y la tabla se estira a él sin encogerla. */}
+                <div className="relative min-w-0 xl:col-span-2">
+                    <div className="xl:absolute xl:inset-0">
+                        <CreditInstallmentsTable cuotas={credito.cuotas ?? []} saldoCapitalTeoricoPorCuota={resumenCuotas.saldo_capital_teorico_por_cuota} />
                     </div>
-                )}
+                </div>
 
-                {deleteError && (
-                    <div className="mt-6">
-                        <Alert variant="danger" title="Error" message={deleteError} onDismiss={() => setDeleteError(null)} />
-                    </div>
-                )}
-
-                <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-100 pt-6 dark:border-gray-800">
-                    {(credito.estado === 'solicitado' || credito.estado === 'aprobado') && canEditar && (
-                        <Button iconOnly startIcon={<SlidersHorizontal className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/editar`)}>
-                            Modificar condiciones
-                        </Button>
+                <div className="flex min-w-0 flex-col gap-4 md:gap-6">
+                    <CreditCapitalRecoveryCard porcentaje={porcentajeCapitalRecuperado} resumenCuotas={resumenCuotas} />
+                    {credito.cliente && (
+                        <CreditConditionsCard
+                            cliente={credito.cliente}
+                            creditoOrigenId={credito.credito_origen_id}
+                            tasaInteres={credito.tasa_interes}
+                            tasaEfectivaAnual={credito.tasa_efectiva_anual ?? ''}
+                            plazo={credito.plazo}
+                            tipoPago={credito.tipo_pago}
+                            fechaDesembolso={credito.fecha_desembolso}
+                            cuotas={credito.cuotas ?? []}
+                        />
                     )}
-                    {credito.estado === 'solicitado' && canAprobar && (
-                        <Button onClick={() => setAccionPendiente('aprobar')}>Aprobar</Button>
-                    )}
-                    {credito.estado === 'aprobado' && canDesembolsar && (
-                        <Button onClick={() => setAccionPendiente('desembolsar')}>Desembolsar</Button>
-                    )}
-                    {canCancelar && puedeCancelarCredito(credito, pagos.length > 0) && (
-                        <Button variant="outline" onClick={() => setAccionPendiente('cancelar')}>
-                            Cancelar
-                        </Button>
-                    )}
-                    {canEliminar && (
-                        <Button variant="outline" onClick={() => setShowDeleteConfirm(true)}>
-                            Eliminar
-                        </Button>
-                    )}
-                    {credito.estado === 'desembolsado' && canRegisterPayment && (
-                        <>
-                            <Button iconOnly startIcon={<HandCoins className="size-4" />} onClick={() => navigate(`/pagos/creditos/${credito.id}/nuevo`)}>Pagar cuota</Button>
-                            <Button iconOnly startIcon={<CircleDollarSign className="size-4" />} variant="outline" onClick={() => navigate(`/pagos/creditos/${credito.id}/liquidar`)}>
-                                Liquidar crédito
-                            </Button>
-                        </>
-                    )}
-                    {credito.estado === 'desembolsado' && canEditar && (
-                        <Button iconOnly startIcon={<CalendarClock className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/reprogramar`)}>
-                            Reprogramar
-                        </Button>
-                    )}
-                    {canViewPayments && (
-                        <Button iconOnly startIcon={<Receipt className="size-4" />} variant="outline" onClick={() => navigate(`/pagos/creditos/${credito.id}`)}>
-                            Ver pagos
-                        </Button>
-                    )}
-                    <Button iconOnly startIcon={<FileText className="size-4" />} variant="outline" onClick={() => navigate(`/creditos/${credito.id}/estado-cuenta`)}>
-                        Estado de cuenta
-                    </Button>
                 </div>
             </div>
 
@@ -195,8 +228,6 @@ export const CreditDetailPage: FC = () => {
                 confirmLabel="Eliminar"
                 isConfirming={isDeleting}
             />
-
-            <CreditInstallmentsTable cuotas={credito.cuotas ?? []} saldoCapitalTeoricoPorCuota={resumenCuotas.saldo_capital_teorico_por_cuota} />
         </div>
     );
 };
