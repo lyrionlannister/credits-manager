@@ -296,7 +296,7 @@ class PagoService
         $tasaDiaria = $credito->tasaMensual() / 100 / TipoPago::Mensual->diasPorPeriodo();
 
         $interes = $capitalPendiente->multiplicarPorTasa($tasaDiaria * $diasTranscurridos);
-        $otrosGastos = $this->otrosGastosLiquidacion($credito);
+        $otrosGastos = $this->otrosGastosLiquidacion($credito, $fechaCorte);
         $total = $capitalPendiente->sumar($interes)->sumar($otrosGastos);
 
         /*
@@ -610,11 +610,12 @@ class PagoService
     /**
      * Otros gastos que cobra una cancelación anticipada (regla 12): las cuotas vencidas no pagadas cobran su saldo
      * completo de otros gastos; la cuota del periodo en curso cobra lo devengado por días desde el inicio de su periodo.
-     * Las cuotas posteriores no generan otros gastos.
+     * Las cuotas posteriores no generan otros gastos. Se cuenta a la fecha de corte de la liquidación, no a hoy: una
+     * liquidación registrada con fecha pasada no cobra lo que se devengó después.
      */
-    private function otrosGastosLiquidacion(Credito $credito): Dinero
+    private function otrosGastosLiquidacion(Credito $credito, CarbonInterface $fechaCorte): Dinero
     {
-        $hoy = now()->startOfDay();
+        $hoy = $fechaCorte->copy()->startOfDay();
         $inicioPeriodo = $credito->fecha_desembolso;
         $total = Dinero::cero();
 
@@ -631,7 +632,7 @@ class PagoService
             if ($cuota->fecha_vencimiento->lt($hoy)) {
                 $total = $total->sumar($pendiente);
             } elseif ($inicio->lte($hoy)) {
-                $devengado = OtrosGastosCalculator::proporcionalPorDias($cuota->valor_otros_gastos, (int) $inicio->diffInDays(now()), $credito->tipo_pago);
+                $devengado = OtrosGastosCalculator::proporcionalPorDias($cuota->valor_otros_gastos, (int) $inicio->diffInDays($fechaCorte), $credito->tipo_pago);
                 $total = $total->sumar($pendiente->menorEntre($devengado));
             }
         }
