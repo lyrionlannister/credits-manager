@@ -96,7 +96,7 @@ class AlineacionQuincenalService
         $ultimaTocada = $tocadas->max('numero_cuota');
         $cursor = $ultimaTocada !== null
             ? $tocadas->firstWhere('numero_cuota', $ultimaTocada)->fecha_vencimiento->toImmutable()
-            : CarbonImmutable::parse($credito->fecha_desembolso);
+            : null;
 
         $cambios = [];
 
@@ -105,7 +105,10 @@ class AlineacionQuincenalService
                 continue;
             }
 
-            $cursor = AmortizacionCalculator::siguienteDiaQuincenal($cursor);
+            // Sin cuotas tocadas, la primera sigue la misma regla de días mínimos con que se generó el plan.
+            $cursor = $cursor === null
+                ? AmortizacionCalculator::primerVencimientoQuincenal(CarbonImmutable::parse($credito->fecha_desembolso))
+                : AmortizacionCalculator::siguienteDiaQuincenal($cursor);
             $antes = $cuota->fecha_vencimiento->toDateString();
 
             if ($antes !== $cursor->toDateString()) {
